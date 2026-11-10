@@ -417,6 +417,8 @@
       p.uno = true;
       this.log(p.name + " está com UNO!", "good");
       Sfx.uno();
+      // após declarar UNO, liberar jogadas novamente imediatamente
+      s.drawnThisTurn = false;
       this.fire();
     },
 

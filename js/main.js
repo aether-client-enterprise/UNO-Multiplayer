@@ -77,6 +77,116 @@
     return n;
   }
 
+  /* ---------- perfil ---------- */
+  const profWins = Number(localStorage.getItem("uno_wins") || 0);
+  const profGames = Number(localStorage.getItem("uno_games") || 0);
+  const profAvatar = localStorage.getItem("uno_avatar") || "av-red";
+  const profName = localStorage.getItem("uno_profile_name") || "";
+
+  $("profile-wins").textContent = profWins;
+  $("profile-games").textContent = profGames;
+  document.querySelectorAll(".avatar-btn").forEach(b => {
+    b.classList.toggle("selected", b.dataset.avatar === profAvatar);
+  });
+  $("in-profile-name").value = profName;
+
+  $("bt-profile-save").addEventListener("click", () => {
+    const name = $("in-profile-name").value.trim() || "Jogador";
+    const avatar = document.querySelector(".avatar-btn.selected")?.dataset.avatar || "av-red";
+    localStorage.setItem("uno_profile_name", name);
+    localStorage.setItem("uno_avatar", avatar);
+    localStorage.setItem("uno_wins", Number($("profile-wins").textContent));
+    localStorage.setItem("uno_games", Number($("profile-games").textContent));
+    global.UI.toast("perfil salvo: " + name + " (" + avatar + ")");
+  });
+
+  document.querySelectorAll(".avatar-btn").forEach(b => {
+    b.addEventListener("click", () {
+      document.querySelectorAll(".avatar-btn").forEach(x => x.classList.remove("selected"));
+      b.classList.add("selected");
+    });
+  });
+
+  function loadProfile() {
+    if (profName) {
+      $("in-name").value = profName;
+      document.querySelectorAll("#my-avatar")[0].className = "avatar " + profAvatar;
+    }
+  }
+
+  /* ---------- amigos ---------- */
+  // carregar/ salvar amigos no localStorage
+  const FRIENDS_KEY = "uno_friends";
+  function loadFriends() {
+    const raw = localStorage.getItem(FRIENDS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }
+  function saveFriends(friends) {
+    localStorage.setItem(FRIENDS_KEY, JSON.stringify(friends));
+    renderFriendsList(friends);
+  }
+  // adicionar amigo (pelo código da sala ou nome)
+  function addFriend(codeOrName, customName) {
+    const friends = loadFriends();
+    // verifica se já existe
+    const exists = friends.find(f => f.code === codeOrName);
+    if (exists) { global.UI.toast("já está na sua lista de amigos"); return; }
+    // código tem que ter 6 chars; se for nome, vamos atribuir um code sintético
+    const code = /^[A-Z0-9]{6}$/.test(codeOrName) ? codeOrName : "FRIE" + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const name = customName || (codeOrName || "Amigo").slice(0, 14);
+    friends.push({ code, name, online: false, avatar: avatars[Math.floor(Math.random() * avatars.length)], added: Date.now() });
+    saveFriends(friends);
+    global.UI.toast(name + " adicionado aos amigos!");
+  }
+  const avatars = ["av-red", "av-yellow", "av-green", "av-blue"];
+
+  function renderFriendsList(friends) {
+    const box = $("friends-list");
+    if (!friends.length) {
+      box.innerHTML = '<div style="color: rgba(255,255,255,.5); font-size: 14px; padding: 20px;">nenhum amigo ainda — adicione um código de 6 caracteres ou um nome</div>';
+      return;
+    }
+    box.innerHTML = friends.map(f => {
+      const onlineClass = f.online ? "online" : "offline";
+      return `<div class="friend-card" data-code="${f.code}">
+        <div class="friend-avatar ${f.avatar}"></div>
+        <div class="friend-info">
+          <div class="friend-name">${f.name}</div>
+          <div class="friend-status ${onlineClass}">${f.online ? "online" : "offline"}</div>
+        </div>
+        <div class="friend-actions">
+          <button class="friend-btn-small" data-action="join">entrar</button>
+          <button class="friend-btn-small" data-action="remove">remover</button>
+        </div>
+      </div>`;
+    }).join("");
+    // eventos
+    box.querySelectorAll(".friend-card").forEach(card => {
+      card.querySelector(".friend-btn-small[data-action='join']").addEventListener("click", () => {
+        const code = card.dataset.code;
+        $("in-code").value = code;
+        $("bt-join").click();
+      });
+      card.querySelector(".friend-btn-small[data-action='remove']").addEventListener("click", () => {
+        removeFriend(card.dataset.code);
+      });
+    });
+  }
+  function removeFriend(code) {
+    let friends = loadFriends();
+    friends = friends.filter(f => f.code !== code);
+    saveFriends(friends);
+    global.UI.toast("removido da lista de amigos");
+  }
+
+  // ao entrar, atualizar status dos amigos que já estão na sala
+  function updateFriendsOnline(statusCodes) {
+    const friends = loadFriends();
+    friends.forEach(f => f.online = statusCodes.includes(f.code));
+    saveFriends(friends);
+    renderFriendsList(friends);
+  }
+
   /* ---------- capa ---------- */
   const hint = $("cover-hint");
   let joinMatch = /#join=([A-Za-z0-9]{4,10})/.exec(location.hash);
@@ -95,17 +205,25 @@
   $("bt-solo").addEventListener("click", () => {
     global.Sfx.unlock();
     global.Sfx.button();
+    const name = $("in-profile-name").value.trim() || "Jogador";
+    const avatar = document.querySelector(".avatar-btn.selected")?.dataset.avatar || "av-red";
+    localStorage.setItem("uno_profile_name", name);
+    localStorage.setItem("uno_avatar", avatar);
     mode = "local";
-    Game.startLobby("local", playerName());
+    Game.startLobby("local", name);
   });
 
   $("bt-create").addEventListener("click", () => {
     global.Sfx.unlock();
     global.Sfx.button();
+    const name = $("in-profile-name").value.trim() || "Jogador";
+    const avatar = document.querySelector(".avatar-btn.selected")?.dataset.avatar || "av-red";
+    localStorage.setItem("uno_profile_name", name);
+    localStorage.setItem("uno_avatar", avatar);
     const btn = $("bt-create");
     btn.disabled = true;
     btn.textContent = "abrindo sala…";
-    global.Net.host(playerName(), (err, code) => {
+    global.Net.host(name, (err, code) => {
       btn.disabled = false;
       btn.textContent = "criar sala online";
       if (err) {
@@ -114,7 +232,7 @@
       }
       mode = "host";
       global.Sfx.join();
-      Game.startLobby("host", playerName());
+      Game.startLobby("host", name);
       global.UI.toast("sala aberta — código " + code);
     });
   });
@@ -166,6 +284,7 @@
   $("bt-bot-del").addEventListener("click", () => { global.Sfx.button(); act({ k: "botDel" }); });
   $("bt-start").addEventListener("click", () => { global.Sfx.button(); act({ k: "start" }); });
   $("bt-lobby-leave").addEventListener("click", () => leaveToCover());
+  $("bt-friends").addEventListener("click", () => { global.Sfx.button(); go("friends"); });
   $("bt-wait-leave").addEventListener("click", () => leaveToCover());
 
   $("bt-copy").addEventListener("click", async () => {
