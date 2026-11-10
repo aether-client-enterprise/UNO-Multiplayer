@@ -15,13 +15,15 @@ sala e link de convite. Sem build, sem servidor próprio — roda direto no nave
 **Online (com amigos)**
 
 1. **criar sala online** → aparece um código de 6 letras/números.
-2. Mande o código ou clique em **copiar link de convite** (o link já abre a tela de
-   entrada com o código preenchido).
-3. Quem entra escolhe **entrar com código**, digita o seu e está na mesa.
+2. Mande o código ou clique em **copiar link de convite** — quem abre o link com o nome
+   já salvo entra **direto na sala**, sem clicar em nada.
+3. Quem prefere entra por **entrar com código**.
 4. O anfitrião pode adicionar bots nas vagas vazias e inicia com **começar** (mínimo 2).
 
-> O multiplayer usa PeerJS (WebRTC) via servidor de sinais público — é preciso internet
-> nos dois lados. Nada de conta, nada de cadastro.
+> Multiplayer por **relay MQTT público** (EMQX → HiveMQ → Mosquitto, com failover):
+> sem WebRTC, sem trava de NAT, funciona atrás de CGNAT/celular. Código inexistente é
+> detectado em ~3 s com erro claro. Nada de conta, nada de cadastro. O anfitrião precisa
+> manter a aba aberta.
 
 ## Regras implementadas
 
@@ -42,7 +44,7 @@ index.html        telas: capa, lobbi, mesa, modais
 css/style.css     visual: capa, feltro da mesa, cartas 100% em CSS
 js/sfx.js         efeitos sonoros WebAudio + grito de UNO via voz do sistema
 js/engine.js      baralho, regras, IA dos bots, estado (host-autoritativo)
-js/net.js         multiplayer P2P (PeerJS): sala por código ou link #join=CODIGO
+js/net.js         multiplayer por relay MQTT público (failover de3 brokers, estado retido por convidado)
 js/ui.js          render da máscara de estado → DOM, sons por transição
 js/main.js        fiação: telas, botões, despacho de ações local/online
 assets/           (opcional) cover.png e table.png substituem os fundos em CSS

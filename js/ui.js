@@ -109,6 +109,7 @@
     /* ---------- mesa ---------- */
     render(m) {
       if (!m) return;
+      this.last = m; // máscara viva: cardClick valida contra o estado atual, não o da criação do nó
       const prev = this.prev;
       const me = m.me;
       const myTurn = m.phase === "playing" && m.turn === me;
@@ -294,7 +295,7 @@
             slot.classList.add("dealt");
             slot.style.animationDelay = (i * 45) + "ms";
           }
-          slot.addEventListener("click", () => this.cardClick(c.id, m));
+          slot.addEventListener("click", () => this.cardClick(c.id));
           box.appendChild(slot);
         });
       }
@@ -309,7 +310,9 @@
       }
     },
 
-    cardClick(id, m) {
+    cardClick(id) {
+      const m = this.last;
+      if (!m) return;
       if (m.phase !== "playing" || m.turn !== m.me) { this.shake(id); Sfx.invalid(); return; }
       const mine = m.players[m.me];
       const card = mine.hand.find(c => c.id === id);

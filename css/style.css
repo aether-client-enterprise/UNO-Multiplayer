@@ -20,10 +20,14 @@ html, body {
   color: #f2f2f2;
   overflow: hidden;
   user-select: none;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button { font-family: inherit; cursor: pointer; }
 input { font-family: inherit; }
+/* toque direto: sem espera de duplo-tap do navegador */
+button, input, .card-slot, .card, .pile, .color-pick { touch-action: manipulation; }
 
 .hidden { display: none !important; }
 
@@ -485,7 +489,8 @@ input { font-family: inherit; }
 .color-ring {
   position: absolute;
   left: 50%; top: 50%;
-  width: 340px; height: 340px;
+  width: clamp(190px, 46vw, 340px);
+  height: clamp(190px, 46vw, 340px);
   transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 6px solid var(--red);
@@ -667,7 +672,7 @@ input { font-family: inherit; }
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding-bottom: 8px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, rgba(0,0,0,.72), transparent);
 }
 .my-meta {
@@ -895,12 +900,68 @@ input { font-family: inherit; }
   :root { --card-w: 74px; --card-h: 111px; }
   .uno-logo { width: 230px; height: 115px; }
   .uno-logo span { font-size: 58px; }
+  .tagline { font-size: 12px; letter-spacing: 3px; }
   .card .pip { font-size: 36px; }
   .card .corner { font-size: 14px; }
-  .hud-turn { font-size: 15px; }
-  .opponents { top: 56px; gap: 10px; }
+  .menu, #in-name { width: min(280px, 84vw); }
+  #in-name { font-size: 16px; } /* iOS não dá zoom no foco */
+
+  .hud {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    padding: 8px;
+    justify-content: center;
+  }
+  .hud-left, .hud-right { gap: 5px; flex-wrap: wrap; justify-content: center; }
+  .hud-chip { font-size: 11px; padding: 4px 9px; }
+  .hud-btn { font-size: 12px; padding: 6px 11px; }
+  .hud-turn { font-size: 15px; order: -1; width: 100%; text-align: center; }
+  .dir-badge { width: 32px; height: 32px; font-size: 17px; }
+
+  .opponents { top: 92px; gap: 10px; }
+  .opponent .avatar { width: 38px; height: 38px; font-size: 16px; }
   .opponent .o-name { max-width: 84px; font-size: 11px; }
+  .opponent .o-score { font-size: 10px; }
+  .o-cards { width: 50px; height: 34px; }
+  .o-cards .mini { width: 22px; height: 32px; }
+
+  .table-center { gap: 18px; transform: translate(-50%, -52%); }
+  .top-label { font-size: 10px; top: calc(100% + 10px); }
+
   .turn-banner { font-size: 21px; padding: 10px 22px; }
-  .log { max-width: 180px; }
+  .turn-actions .btn { padding: 12px 24px; }
+  .uno-btn { width: 68px; height: 52px; font-size: 15px; }
+  .hand { padding: 42px 12px 4px; }
+  .log { max-width: 160px; bottom: 4px; left: 6px; }
+  .log-line { font-size: 11px; padding: 4px 8px; }
+
   .code { font-size: 38px; letter-spacing: 6px; }
+  .lobby-panel { gap: 14px; }
+  .modal-box { padding: 20px 18px; }
+  .color-pick { height: 66px; }
+}
+
+/* celular deitado: altura curta manda mais que a largura */
+@media (max-height: 560px) and (orientation: landscape) {
+  :root { --card-w: 62px; --card-h: 93px; }
+  .uno-logo { width: 170px; height: 84px; }
+  .uno-logo span { font-size: 44px; }
+  .cover-panel { gap: 9px; }
+  .tagline { font-size: 11px; }
+  .hud { padding: 5px 8px; row-gap: 3px; }
+  .hud-turn { font-size: 13px; }
+  .opponents { top: 54px; gap: 8px; }
+  .opponent .avatar { width: 32px; height: 32px; font-size: 14px; }
+  .opponent .o-name { font-size: 10px; max-width: 70px; }
+  .opponent .o-score, .o-cards .mini:nth-child(3) { display: none; }
+  .table-center { transform: translate(-50%, -50%); gap: 26px; }
+  .color-ring { width: clamp(150px, 30vh, 240px); height: clamp(150px, 30vh, 240px); }
+  .card .pip { font-size: 30px; }
+  .card .corner { font-size: 12px; }
+  .hand { min-height: calc(var(--card-h) + 34px); padding: 34px 10px 2px; }
+  .my-meta .avatar { display: none; }
+  .my-meta { gap: 8px; }
+  .turn-banner { font-size: 17px; padding: 7px 18px; }
+  .turn-actions .btn { padding: 9px 18px; font-size: 13px; }
+  .log { display: none; }
 }

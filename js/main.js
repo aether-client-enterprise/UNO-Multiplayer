@@ -79,7 +79,7 @@
 
   /* ---------- capa ---------- */
   const hint = $("cover-hint");
-  const joinMatch = /#join=([A-Za-z0-9]{4,10})/.exec(location.hash);
+  let joinMatch = /#join=([A-Za-z0-9]{4,10})/.exec(location.hash);
   if (joinMatch) {
     $("in-code").value = joinMatch[1].toUpperCase();
     $("join-panel").classList.remove("hidden");
@@ -119,14 +119,7 @@
     });
   });
 
-  $("bt-join").addEventListener("click", () => {
-    global.Sfx.unlock();
-    global.Sfx.button();
-    const code = $("in-code").value.trim();
-    if (code.length < 4) {
-      global.UI.info("código", "digite o código de 6 caracteres da sala.");
-      return;
-    }
+  function doJoin(code) {
     const btn = $("bt-join");
     btn.disabled = true;
     btn.textContent = "entrando…";
@@ -142,10 +135,31 @@
       go("waiting");
       global.UI.toast("conectado! aguardando o anfitrião…");
       hint.textContent = "";
+      joinMatch = null;
+      // limpa o #join= pra um reload não tentar reentrar sozinho
+      if (location.hash) history.replaceState(null, "", location.pathname + location.search);
     });
+  }
+
+  $("bt-join").addEventListener("click", () => {
+    global.Sfx.unlock();
+    global.Sfx.button();
+    const code = $("in-code").value.trim().toUpperCase();
+    if (code.length < 4) {
+      global.UI.info("código", "digite o código de 6 caracteres da sala.");
+      return;
+    }
+    doJoin(code);
   });
   $("in-code").addEventListener("keydown", e => { if (e.key === "Enter") $("bt-join").click(); });
   $("in-name").addEventListener("keydown", e => { if (e.key === "Enter" && joinMatch) $("bt-join").click(); });
+
+  // link de convite com nome salvo: entra direto, sem clicar em nada
+  if (joinMatch && (localStorage.getItem("uno_name") || "").trim()) {
+    $("join-panel").classList.add("hidden");
+    hint.textContent = "entrando pela sala do convite…";
+    setTimeout(() => doJoin(joinMatch[1].toUpperCase()), 80);
+  }
 
   /* ---------- lobbi ---------- */
   $("bt-bot-add").addEventListener("click", () => { global.Sfx.button(); act({ k: "bot" }); });
