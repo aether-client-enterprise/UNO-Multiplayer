@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UNO — cartas online</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23111'/%3E%3Cellipse cx='32' cy='32' rx='26' ry='16' fill='%23d92b1e' stroke='%23fff' stroke-width='3' transform='rotate(-8 32 32)'/%3E%3Ctext x='32' y='39' font-size='19' font-weight='900' font-style='italic' fill='%23fff' text-anchor='middle' font-family='Arial'%3EUNO%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ CAPA ============ -->
+<div id="screen-cover" class="screen active">
+  <div class="cover-bg"></div>
+  <div class="cover-shade"></div>
+  <div class="cover-panel">
+    <div class="uno-logo"><span>UNO</span></div>
+    <div class="tagline">cartas &middot; amizade &middot; trai&ccedil;&atilde;o</div>
+
+    <input id="in-name" type="text" maxlength="14" placeholder="seu nome" autocomplete="off" spellcheck="false">
+
+    <div class="menu">
+      <button id="bt-solo" class="btn btn-red">jogar vs computador</button>
+      <button id="bt-create" class="btn btn-blue">criar sala online</button>
+      <button id="bt-join-toggle" class="btn btn-green">entrar com c&oacute;digo</button>
+    </div>
+
+    <div id="join-panel" class="join-panel hidden">
+      <input id="in-code" type="text" maxlength="6" placeholder="C&Oacute;DIGO" autocomplete="off" spellcheck="false">
+      <button id="bt-join" class="btn btn-red">entrar</button>
+    </div>
+
+    <div class="cover-foot">
+      <button id="bt-sound" class="ghost">som: ligado</button>
+      <button id="bt-rules" class="ghost">regras</button>
+    </div>
+    <div id="cover-hint" class="hint"></div>
+  </div>
+</div>
+
+<!-- ============ LOBBI ============ -->
+<div id="screen-lobby" class="screen">
+  <div class="lobby-bg"></div>
+  <div class="lobby-panel">
+    <h2 id="lobby-title">sala</h2>
+    <div id="lobby-code-block" class="code-block hidden">
+      <div class="code-label">c&oacute;digo da sala</div>
+      <div id="room-code" class="code">------</div>
+      <button id="bt-copy" class="btn btn-blue btn-sm">copiar link de convite</button>
+    </div>
+    <div id="lobby-players" class="lobby-players"></div>
+    <div class="lobby-actions">
+      <button id="bt-bot-add" class="btn btn-green btn-sm">+ bot</button>
+      <button id="bt-bot-del" class="btn btn-ghost btn-sm">&minus; bot</button>
+      <button id="bt-start" class="btn btn-red" disabled>come&ccedil;ar</button>
+      <button id="bt-lobby-leave" class="btn btn-ghost btn-sm">sair</button>
+    </div>
+    <div id="lobby-hint" class="hint">aguardando jogadores&hellip; m&iacute;nimo 2</div>
+  </div>
+</div>
+<!-- ============ LOBBI CONVIDADO (espera) ============ -->
+<div id="screen-waiting" class="screen">
+  <div class="lobby-bg"></div>
+  <div class="lobby-panel">
+    <h2>voc&ecirc; est&aacute; na sala</h2>
+    <div class="code-block">
+      <div class="code-label">c&oacute;digo</div>
+      <div id="wait-code" class="code">------</div>
+    </div>
+    <div id="wait-players" class="lobby-players"></div>
+    <div id="waiting-hint" class="hint">aguardando o anfitri&atilde;o iniciar a partida&hellip;</div>
+    <button id="bt-wait-leave" class="btn btn-ghost btn-sm">sair da sala</button>
+  </div>
+</div>
+
+<!-- ============ MESA ============ -->
+<div id="screen-game" class="screen">
+  <div class="table-bg"></div>
+  <div class="table-vignette"></div>
+
+  <header class="hud">
+    <div class="hud-left">
+      <div id="hud-dir" class="dir-badge" title="sentido de jogo">&#8635;</div>
+      <div id="hud-round" class="hud-chip">rodada 1</div>
+      <div id="hud-target" class="hud-chip">meta 500</div>
+    </div>
+    <div id="hud-turn" class="hud-turn">sua vez</div>
+    <div class="hud-right">
+      <button id="bt-sound2" class="hud-btn">som</button>
+      <button id="bt-score" class="hud-btn">placar</button>
+      <button id="bt-rules2" class="hud-btn">regras</button>
+      <button id="bt-exit" class="hud-btn">sair</button>
+    </div>
+  </header>
+
+  <div id="opponents" class="opponents"></div>
+
+  <div class="table-center">
+    <div id="color-ring" class="color-ring"></div>
+    <div id="draw-pile" class="pile" title="comprar carta">
+      <div class="card back pile-back pile-b3"></div>
+      <div class="card back pile-back pile-b2"></div>
+      <div class="card back pile-back pile-b1"></div>
+      <div class="card back pile-top"></div>
+      <span id="pile-count" class="pile-count">0</span>
+    </div>
+    <div id="discard-pile" class="discard"></div>
+    <div id="top-label" class="top-label"></div>
+  </div>
+
+  <div id="turn-banner" class="turn-banner hidden"></div>
+
+  <div class="my-area">
+    <div class="my-meta">
+      <div id="my-avatar" class="avatar av-red">?</div>
+      <div class="my-info">
+        <div id="my-name" class="my-name">voc&ecirc;</div>
+        <div id="my-score" class="my-score">0 pts</div>
+      </div>
+      <button id="bt-uno" class="uno-btn" disabled>UNO!</button>
+      <div id="uno-timer" class="uno-timer hidden">0</div>
+    </div>
+    <div id="my-hand" class="hand"></div>
+    <div class="turn-actions">
+      <button id="bt-draw" class="btn btn-blue" disabled>comprar</button>
+      <button id="bt-pass" class="btn btn-ghost" disabled>passar</button>
+    </div>
+  </div>
+
+  <div id="log" class="log"></div>
+</div>
+
+<!-- ============ MODAIS ============ -->
+<div id="modal-color" class="modal hidden">
+  <div class="modal-box color-box">
+    <h3>escolha a cor</h3>
+    <div class="color-grid">
+      <button class="color-pick cp-red" data-color="red" title="vermelho"></button>
+      <button class="color-pick cp-yellow" data-color="yellow" title="amarelo"></button>
+      <button class="color-pick cp-green" data-color="green" title="verde"></button>
+      <button class="color-pick cp-blue" data-color="blue" title="azul"></button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-round" class="modal hidden">
+  <div class="modal-box">
+    <h3 id="round-title">rodada encerrada</h3>
+    <div id="round-list" class="score-list"></div>
+    <div id="round-points" class="round-points"></div>
+    <button id="bt-next-round" class="btn btn-red">pr&oacute;xima rodada</button>
+  </div>
+</div>
+
+<div id="modal-score" class="modal hidden">
+  <div class="modal-box">
+    <h3>placar</h3>
+    <div id="score-list" class="score-list"></div>
+    <button id="bt-score-close" class="btn btn-ghost btn-sm">fechar</button>
+  </div>
+</div>
+
+<div id="modal-rules" class="modal hidden">
+  <div class="modal-box rules-box">
+    <h3>regras</h3>
+    <ul class="rules">
+      <li>108 cartas: 4 cores com n&uacute;meros 0&ndash;9, +2, bloqueio (&#8856;), invers&atilde;o (&#8644;), 4 curingas e 4 +4.</li>
+      <li>Comece com 7 cartas. Jogue cartas da mesma cor, mesmo n&uacute;mero/s&iacute;mbolo, ou um curinga.</li>
+      <li>&#8856; bloqueia o pr&oacute;ximo jogador. &#8644; inverte o sentido (com 2 jogadores, bloqueia). +2 faz o pr&oacute;ximo comprar 2 e ser pulado.</li>
+      <li>Curinga escolhe a cor. +4: o pr&oacute;ximo compra 4 e &eacute; pulado &mdash; s&oacute; &eacute; v&aacute;lido se voc&ecirc; n&atilde;o tiver a cor atual na m&atilde;o.</li>
+      <li>Na sua vez: jogue uma carta v&aacute;lida ou compre uma carta da mesa (pode jog&aacute;-la em seguida ou passar).</li>
+      <li>Fale UNO! ao ficar com 1 carta. Se esquecer, compra 2 de penalidade.</li>
+      <li>Quem zera a m&atilde;o marca os pontos das cartas dos outros (n&uacute;mero = valor, a&ccedil;&atilde;o = 20, curinga = 50). Primeiro a 500 vence.</li>
+    </ul>
+    <button id="bt-rules-close" class="btn btn-ghost btn-sm">fechar</button>
+  </div>
+</div>
+
+<div id="modal-info" class="modal hidden">
+  <div class="modal-box">
+    <h3 id="info-title">aviso</h3>
+    <p id="info-text" class="info-text"></p>
+    <button id="bt-info-close" class="btn btn-red btn-sm">ok</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/sfx.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/net.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
