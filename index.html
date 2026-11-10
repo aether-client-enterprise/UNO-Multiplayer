@@ -33,28 +33,9 @@
     <div class="cover-foot">
       <button id="bt-sound" class="ghost">som: ligado</button>
       <button id="bt-rules" class="ghost">regras</button>
+      <button id="bt-friends-cover" class="ghost">amigos</button>
     </div>
     <div id="cover-hint" class="hint"></div>
-  </div>
-</div>
-
-<!-- ============ PERFIL ============ -->
-<div id="screen-profile" class="screen">
-  <div class="lobby-bg"></div>
-  <div class="lobby-panel">
-    <h2>perfil</h2>
-    <div class="avatar-select">
-      <button class="avatar-btn av-red" data-avatar="av-red" title="vermelho"></button>
-      <button class="avatar-btn av-yellow" data-avatar="av-yellow" title="amarelo"></button>
-      <button class="avatar-btn av-green" data-avatar="av-green" title="verde"></button>
-      <button class="avatar-btn av-blue" data-avatar="av-blue" title="azul"></button>
-    </div>
-    <input id="in-profile-name" type="text" maxlength="14" placeholder="seu nome" autocomplete="off" spellcheck="false">
-    <button id="bt-profile-save" class="btn btn-blue">salvar perfil</button>
-    <div class="profile-stats">
-      <div>vitórias: <span id="profile-wins">0</span></div>
-      <div>partidas: <span id="profile-games">0</span></div>
-    </div>
   </div>
 </div>
 
@@ -93,6 +74,7 @@
       <button id="bt-bot-add" class="btn btn-green btn-sm">+ bot</button>
       <button id="bt-bot-del" class="btn btn-ghost btn-sm">&minus; bot</button>
       <button id="bt-start" class="btn btn-red" disabled>começar</button>
+      <button id="bt-friends" class="btn btn-ghost btn-sm">amigos</button>
       <button id="bt-lobby-leave" class="btn btn-ghost btn-sm">sair</button>
     </div>
     <div id="lobby-hint" class="hint">aguardando jogadores&hellip; m&iacute;nimo 2</div>
@@ -111,29 +93,11 @@
       <input id="in-add-friend" type="text" placeholder="código ou nome..." maxlength="14" autocomplete="off" spellcheck="false">
       <button id="bt-add-friend" class="btn btn-blue">adicionar</button>
     </div>
-    <div id="friends-hint" class="hint"></div>
+    <div id="friends-hint" class="hint">adicione pelo código da sala ou pelo nome</div>
+    <button id="bt-friends-back" class="btn btn-ghost btn-sm">voltar</button>
   </div>
 </div>
 
-<!-- ============ LOBBI CONVIDADO (espera) ============ -->
-  <div class="lobby-bg"></div>
-  <div class="lobby-panel">
-    <h2 id="lobby-title">sala</h2>
-    <div id="lobby-code-block" class="code-block hidden">
-      <div class="code-label">c&oacute;digo da sala</div>
-      <div id="room-code" class="code">------</div>
-      <button id="bt-copy" class="btn btn-blue btn-sm">copiar link de convite</button>
-    </div>
-    <div id="lobby-players" class="lobby-players"></div>
-    <div class="lobby-actions">
-      <button id="bt-bot-add" class="btn btn-green btn-sm">+ bot</button>
-      <button id="bt-bot-del" class="btn btn-ghost btn-sm">&minus; bot</button>
-      <button id="bt-start" class="btn btn-red" disabled>come&ccedil;ar</button>
-      <button id="bt-lobby-leave" class="btn btn-ghost btn-sm">sair</button>
-    </div>
-    <div id="lobby-hint" class="hint">aguardando jogadores&hellip; m&iacute;nimo 2</div>
-  </div>
-</div>
 <!-- ============ LOBBI CONVIDADO (espera) ============ -->
 <div id="screen-waiting" class="screen">
   <div class="lobby-bg"></div>

@@ -101,7 +101,7 @@
   });
 
   document.querySelectorAll(".avatar-btn").forEach(b => {
-    b.addEventListener("click", () {
+    b.addEventListener("click", () => {
       document.querySelectorAll(".avatar-btn").forEach(x => x.classList.remove("selected"));
       b.classList.add("selected");
     });
@@ -284,7 +284,28 @@
   $("bt-bot-del").addEventListener("click", () => { global.Sfx.button(); act({ k: "botDel" }); });
   $("bt-start").addEventListener("click", () => { global.Sfx.button(); act({ k: "start" }); });
   $("bt-lobby-leave").addEventListener("click", () => leaveToCover());
-  $("bt-friends").addEventListener("click", () => { global.Sfx.button(); go("friends"); });
+  /* ---------- amigos: navegação e ações ---------- */
+  let friendsReturn = "cover";
+  function openFriends(from) {
+    global.Sfx.button();
+    friendsReturn = from || curScreen || "cover";
+    renderFriendsList(loadFriends());
+    go("friends");
+  }
+  $("bt-friends").addEventListener("click", () => openFriends("lobby"));
+  $("bt-friends-cover").addEventListener("click", () => openFriends("cover"));
+  $("bt-friends-back").addEventListener("click", () => {
+    global.Sfx.button();
+    go(friendsReturn || "cover");
+  });
+  $("bt-add-friend").addEventListener("click", () => {
+    global.Sfx.button();
+    const v = $("in-add-friend").value.trim();
+    if (!v) { global.UI.toast("digite um código de 6 caracteres ou um nome"); return; }
+    addFriend(v.toUpperCase());
+    $("in-add-friend").value = "";
+  });
+  $("in-add-friend").addEventListener("keydown", e => { if (e.key === "Enter") $("bt-add-friend").click(); });
   $("bt-wait-leave").addEventListener("click", () => leaveToCover());
 
   $("bt-copy").addEventListener("click", async () => {
