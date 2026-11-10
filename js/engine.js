@@ -233,9 +233,14 @@
       for (let i = 0; i < 7; i++) {
         for (const p of s.players) p.hand.push(s.draw.pop());
       }
-      // primeira carta: sem curinga (recolhe e reembaralha)
+      // primeira carta: sem curinga — as sorteadas voltam pro baralho (senão somem: 107 cartas)
       let first;
-      do { first = s.draw.pop(); } while (first.kind === "wild" || first.kind === "wild4");
+      const bounced = [];
+      do {
+        first = s.draw.pop();
+        if (first.kind === "wild" || first.kind === "wild4") bounced.push(first);
+      } while (first.kind === "wild" || first.kind === "wild4");
+      if (bounced.length) s.draw = shuffle(s.draw.concat(bounced));
       s.discard.push(first);
       s.top = first;
       s.color = first.color;
