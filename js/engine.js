@@ -278,11 +278,6 @@
       if (a.k === "pass") return this.passTurn(seat);
     },
 
-    winnerSeatOwner() {
-      // dono da rodada (quem zera) ou o anfitrião como fallback
-      return this.state.winner !== null && this.state.winner !== undefined ? this.state.winner : 0;
-    },
-
     startRoundNext() {
       this.state.round += 1;
       this.startRound();
@@ -430,12 +425,6 @@
       const s = this.state;
       const n = s.players.length;
       s.turn = ((s.turn + steps * s.dir) % n + n) % n;
-      s.drawnThisTurn = false;
-    },
-
-    afterTurnAdvance() {
-      // usado quando o jogador da vez é removido do meio do caminho
-      const s = this.state;
       s.drawnThisTurn = false;
     },
 

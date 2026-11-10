@@ -50,6 +50,8 @@
   }
 
   Game.emit = () => renderFlow(Game.mask(Game.mySeat));
+  // motor recusou uma ação (fora de vez / carta inválida) — avisa o jogador
+  Game.onReject = () => global.Sfx.invalid();
 
   /* ---------- sair pro cobertor ---------- */
   function leaveToCover(msg) {
