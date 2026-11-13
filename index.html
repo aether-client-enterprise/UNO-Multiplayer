@@ -130,6 +130,8 @@
       <button id="bt-score" class="hud-btn">placar</button>
       <button id="bt-rules2" class="hud-btn">regras</button>
       <button id="bt-exit" class="hud-btn">sair</button>
+      <button id="chat-btn" class="hud-btn" style="margin-left: 8px;">⚡</button>
+      <button id="voice-btn" class="hud-btn" style="margin-left: 8px;">🎤</button>
     </div>
   </header>
 
@@ -168,6 +170,24 @@
   </div>
 
   <div id="log" class="log"></div>
+
+    <!-- Modal de chat -->
+    <div id="chat-modal" class="modal hidden">
+      <div class="modal-box">
+        <h3>Chat</h3>
+        <div class="chat-area" id="chat-area" style="height: 150px; overflow-y: auto; padding: 8px; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; line-height: 1.4;">
+          <div style="color: var(--gold); font-size: 10px; margin-bottom: 8px;">Digite uma mensagem...</div>
+          <div id="chat-messages" style="margin-bottom: 8px;"></div>
+          <div style="display: flex; gap: 4px;">
+            <input id="chat-input" type="text" style="flex: 1; padding: 4px; border-radius: 10px; border: 1px solid #555; background: #333; color: #fff;" placeholder="Sua mensagem..." maxlength="50">
+            <button id="chat-send" style="padding: 0 8px;">Enviar</button>
+          </div>
+        </div>
+        <div style="margin-top: 8px; text-align: right;">
+          <button id="chat-close" style="padding: 4px 8px;">Fechar</button>
+        </div>
+      </div>
+    </div>
 </div>
 
 <!-- ============ MODAIS ============ -->

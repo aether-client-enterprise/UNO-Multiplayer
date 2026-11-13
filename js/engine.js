@@ -7,8 +7,7 @@
 
   const COLORS = ["red", "yellow", "green", "blue"];
   const COLOR_PT = { red: "vermelho", yellow: "amarelo", green: "verde", blue: "azul" };
-  const TARGET = 500;
-  const MAX_PLAYERS = 4;
+  const TARGET = 500;  const MAX_PLAYERS = 4;
 
   let idc = 0;
   function mk(color, kind, value) {
@@ -128,6 +127,13 @@
     emit: null,        // chamado a cada mutação (render local + broadcast)
     timers: [],
 
+    /* ---------- novo: timer de 10s por turno ---------- */
+    gameTimer: null,
+    gameStartTime: null,
+    GAME_TIME_MS: number = 5 * 60 * 1000,  // 5 minutos
+    turnTimer: null,
+    TURN_LIMIT_MS: 10000,  // 10 segundos
+
     /* ---------- ciclo de sala ---------- */
     startLobby(mode, hostName) {
       this.mode = mode;
@@ -215,10 +221,28 @@
       this.fire();
     },
 
+    clearTurnTimer() {
+      if (this.turnTimer) clearTimeout(this.turnTimer);
+      this.turnTimer = null;
+    },
+
+    startTurnTimer() {
+      const s = this.state;
+      if (!s || s.phase !== "playing" || s.turn === null) return;
+      this.clearTurnTimer();
+      this.turnTimer = setTimeout(() => {
+        if (this.state && this.state.turn === s.turn) {
+          this.turnAdvance(1);
+        }
+      }, this.TURN_LIMIT_MS);
+    },
+
     /* ---------- rodada ---------- */
     startRound() {
       const s = this.state;
       this.clearTimers();
+      this.clearGameTimer();
+      this.startGameTimer();
       s.phase = "playing";
       s.dir = 1;
       s.color = null;
@@ -433,6 +457,7 @@
       const n = s.players.length;
       s.turn = ((s.turn + steps * s.dir) % n + n) % n;
       s.drawnThisTurn = false;
+      this.clearTurnTimer();
     },
 
     give(seat, count) {
@@ -571,8 +596,50 @@
         clearTimeout(this.state.grace.timer);
         this.state.grace = null;
       }
+      this.clearTurnTimer();
     },
 
+    clearGameTimer() {
+      if (this.gameTimer) clearTimeout(this.gameTimer);
+      this.gameTimer = null;
+      this.gameStartTime = null;
+    },
+
+    startGameTimer() {
+      const s = this.state;
+      if (!s || s.phase !== "playing") return;
+      this.clearGameTimer();
+      this.gameStartTime = Date.now();
+      this.gameTimer = setTimeout(() => {
+        this.endGameByTime();
+      }, this.GAME_TIME_MS);
+    },
+
+    endGameByTime() {
+      const s = this.state;
+      if (!s) return;
+      let winnerSeat = null;
+      let minCards = Infinity;
+      for (const p of s.players) {
+        if (p.hand.length < minCards) {
+          minCards = p.hand.length;
+          winnerSeat = s.players.indexOf(p);
+        }
+      }      if (winnerSeat !== null && winnerSeat !== -1) {
+        const winner = s.players[winnerSeat];
+        s.phase = "matchover";
+        s.winner = winnerSeat;
+        s.last = { kind: "match", text: winner.name + " venceu por tempo! (menos cartas)" };
+        this.log(winner.name + " venceu por tempo! (menos cartas)", "good");
+        this.fire();
+      } else {
+        s.phase = "matchover";
+        s.winner = 0;
+        s.last = { kind: "match", text: "Empate! Todos tiveram mesma quantidade de cartas." };
+        this.log("Empate! Todos tiveram mesma quantidade de cartas.", "good");
+        this.fire();
+      }
+    },
     /* ---------- máscara por espectador (não vaza mão dos outros) ---------- */
     mask(viewer) {
       const s = this.state;

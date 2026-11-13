@@ -333,7 +333,11 @@
   });
 
   /* ---------- mesa ---------- */
-  $("bt-draw").addEventListener("click", () => { global.Sfx.button(); act({ k: "draw" }); });
+  $("bt-draw").addEventListener("click", () => {
+    global.Sfx.button();
+    global.main.act({ k: "draw" });
+    // após comprar, a vez passa automaticamente — o engine já controla drawnThisTurn
+  });
   $("draw-pile").addEventListener("click", () => {
     if ($("draw-pile").classList.contains("disabled")) return;
     act({ k: "draw" });
@@ -436,7 +440,90 @@
     global.UI.toast("rede: " + ((e && (e.type || e.message)) || "erro"));
   };
 
-  /* ---------- gatilhos globais ---------- */
+  /* ---------- sistema de chat ---------- */
+  // carregar mensagens salvas
+  const loadChatMessages = () => {
+    const msgs = localStorage.getItem("uno_chat_msgs");
+    return msgs ? JSON.parse(msgs) : [];
+  };
+  const saveChatMessage = (name, text, avatar) => {
+    const msgs = loadChatMessages();
+    msgs.push({ name, text, avatar, time: new Date().toLocaleTimeString() });
+    localStorage.setItem("uno_chat_msgs", JSON.stringify(msgs));
+  };
+  // renderizar mensagens no DOM
+  const renderChatMessages = (msgs) => {
+    const area = $("#chat-messages");
+    if (!area) return;
+    area.innerHTML = msgs.map(m => `<div style="margin: 4px 0; padding: 4px 8px; border-radius: 10px; background: rgba(255,212,94,.2);">
+      <span style="color: var(--gold); font-size: 10px;">${m.time}</span> ${m.name}: ${m.text}</div>`).join("");
+  };
+  // toggle chat modal
+  let chatVisible = false;
+  $("bt-friends").addEventListener("click", () => { global.Sfx.button(); go("friends"); });
+  $("bt-friends-cover").addEventListener("click", () => openFriends("cover"));
+  $("bt-friends-back").addEventListener("click", () => {
+    global.Sfx.button();
+    go(friendsReturn || "cover");
+  });
+  $("bt-add-friend").addEventListener("click", () => {
+    global.Sfx.button();
+    const v = $("in-add-friend").value.trim();
+    if (!v) { global.UI.toast("digite um código de 6 caracteres ou um nome"); return; }
+    addFriend(v.toUpperCase());
+    $("in-add-friend").value = "";
+  });
+  // event listeners for chat buttons
+  $("chat-btn").addEventListener("click", () => {
+    global.Sfx.button();
+    chatVisible = !chatVisible;
+    const panel = $("chat-modal");
+    if (chatVisible) {
+      panel.classList.remove("hidden");
+      renderChatMessages(loadChatMessages());
+    } else {
+      panel.classList.add("hidden");
+    }
+  });
+  $("chat-close").addEventListener("click", () => {
+    global.Sfx.button();
+    chatVisible = false;
+    $("chat-modal").classList.add("hidden");
+  });
+  $("chat-send").addEventListener("click", () => {
+    global.Sfx.button();
+    const input = $("chat-input");
+    const text = input.value.trim();
+    if (!text) return;
+    // get current player name
+    const m = Game.state;
+    const name = m ? (m.players[m.me] ? m.players[m.me].name : "Jogador") : "Jogador";
+    const avatar = m ? (m.players[m.me] ? m.players[m.me].av : "av-red") : "av-red";
+    saveChatMessage(name, text, avatar);
+    renderChatMessages(loadChatMessages());
+    input.value = "";
+  });
+  // allow pressing Enter to send
+  $("chat-input").addEventListener("keydown", e => { if (e.key === "Enter") $("chat-send").click(); });
+
+  /* ---------- sistema de voz ---------- */
+  // indicador visual de voz
+  const voices = ["🔊", "🔉", "🔈"];
+  let voiceIndex = 0;
+  $("voice-btn").addEventListener("click", () => {
+    global.Sfx.button();
+    // alternar ícone de voz
+    voiceIndex = (voiceIndex + 1) % voices.length;
+    $("voice-btn").textContent = voices[voiceIndex];
+    // tentar usar Web Speech API para síntese de fala
+    if (window.SpeechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance("Sua vez de jogar!");
+      utterance.rate = 1;
+      utterance.volume = 1;
+      utterance.pitch = 1;
+      window.speechSynthesis.speak(utterance);
+    }
+  });
   document.addEventListener("pointerdown", () => global.Sfx.unlock(), { once: true });
   setInterval(() => global.UI.tick(), 250);
 

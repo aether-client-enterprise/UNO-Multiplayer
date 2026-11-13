@@ -200,6 +200,17 @@
       const unoBtn = $("bt-uno");
       unoBtn.disabled = !(mine && ((mine.hand && mine.hand.length === 2) || m.grace != null));
 
+      /* --- ícones de chat e voz --- */
+      const chatBtn = $("chat-btn");
+      const voiceBtn = $("voice-btn");
+      const chatPanel = $("chat-panel");
+      const chatInput = $("chat-input");
+      const chatSend = $("chat-send");
+      const chatMessages = $("chat-messages");
+      chatBtn.disabled = !myTurn;
+      voiceBtn.disabled = !myTurn;
+      chatPanel.classList.add("hidden");
+
       /* --- janela do UNO --- */
       const ut = $("uno-timer");
       if (m.grace != null) {
@@ -346,23 +357,7 @@
     },
 
     logLines(m) {
-      const box = $("log");
-      const newest = [];
-      for (const line of m.log) {
-        if (this.seenLog.has(line.id)) break;
-        newest.push(line);
-      }
-      if (newest.length) {
-        this.seenLog.add(newest[0].id);
-        for (const line of newest) {
-          const d = document.createElement("div");
-          d.className = "log-line" + (line.c ? " " + line.c : "");
-          d.textContent = line.t;
-          box.prepend(d);
-          this.seenLog.add(line.id);
-        }
-        while (box.children.length > 6) box.lastChild.remove();
-      }
+      // log removido para tela mais limpa
     },
 
     roundModal(m) {
