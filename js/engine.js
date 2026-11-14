@@ -306,7 +306,9 @@
       if (!s) return;
       if (a.k === "start") {
         // modo local: anfitrião pode começar sozinho (contra bots ou humano)
-        if (s.mode === "local" && seat === 0 && s.players.length >= 2) { s.round = 1; for (const p of s.players) p.score = 0; this.startRound(); return; }
+        // usa o modo global do main.js como fallback se s.mode estiver indefinido
+        const isLocalMode = s.mode === "local" || (typeof mode !== 'undefined' && mode === "local");
+        if (isLocalMode && seat === 0 && s.players.length >= 2) { s.round = 1; for (const p of s.players) p.score = 0; this.startRound(); return; }
         // multiplayer: precisa de 2 jogadores humanos (host + guest) para concordarem juntos
         if (s.phase === "lobby" && s.players.length >= 2 && seat === 0) {
           // conta humanos
