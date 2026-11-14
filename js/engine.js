@@ -305,23 +305,23 @@
       const s = this.state;
       if (!s) return;
       if (a.k === "start") {
-        // modo local: anfitrião pode começar sozinho
+        // modo local: anfitrião pode começar sozinho (contra bots ou humano)
         if (s.mode === "local" && seat === 0 && s.players.length >= 2) { s.round = 1; for (const p of s.players) p.score = 0; this.startRound(); return; }
-        // multiplayer: inicia se houver 2 jogadores humanos (host + guest real)
+        // multiplayer: precisa de 2 jogadores humanos (host + guest) para concordarem juntos
         if (s.phase === "lobby" && s.players.length >= 2 && seat === 0) {
-      // conta jogadores humanos (não-bot)
-      const humanos = s.players.filter(p => !p.bot).length;
-      if (humanos >= 2) {
-        // ambos presentes: pode começar imediatamente
-        s.round = 1; for (const p of s.players) p.score = 0; this.startRound();
-      } else if (humanos === 1) {
-        // apenas host humano: marcarei consentimento e aguarda guest se juntar
-        if (!s.consensoHost) s.consensoHost = true;
-        if (s.consensoHost && s.consensoGuest) {
-          s.round = 1; for (const p of s.players) p.score = 0; this.startRound();
-        }
-      }
-      return;
+          // conta humanos
+          const humanos = s.players.filter(p => !p.bot).length;
+          if (humanos >= 2) {
+            // 2+ humanos presentes: começa imediatamente
+            s.round = 1; for (const p of s.players) p.score = 0; this.startRound();
+          } else if (humanos === 1 && !s.consensoHost) {
+            // só host humano: marca que concordou e aguarda o guest também concordar
+            s.consensoHost = true;
+            if (s.consensoHost && s.consensoGuest) {
+              s.round = 1; for (const p of s.players) p.score = 0; this.startRound();
+            }
+          }
+          return;
         }
         return;
       }
@@ -505,8 +505,8 @@
       const p = s.players[seat];
       if (!p) return;
       const inGrace = !!(s.grace && s.grace.seat === seat);
-      // pode gritar com 2 (antes de jogar) ou com 1 carta na mão (depois de jogar)
-      if (!inGrace && p.hand.length !== 1 && p.hand.length !== 2) return this.reject(seat);
+      // somente com 1 carta na mão — conforme requisito: gritar UNO só com 1 carta
+      if (!inGrace && p.hand.length !== 1) return this.reject(seat);
       if (p.uno) return; // já falou UNO nesta rodada
       if (inGrace) {
         // chegou a tempo: cancela a penalidade
