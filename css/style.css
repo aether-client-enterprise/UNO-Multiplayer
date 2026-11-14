@@ -508,6 +508,9 @@ button, input, .card-slot, .card, .pile, .color-pick { touch-action: manipulatio
   height: var(--card-h);
   cursor: pointer;
 }
+/* especificidade maior que .card (position: relative), senão as cartas do monte
+   empilham no fluxo normal e descem pela mesa inteira */
+.pile .card { position: absolute; inset: 0; }
 .pile-back { position: absolute; inset: 0; }
 .pile-b1 { transform: rotate(-6deg) translate(-4px, 3px); }
 .pile-b2 { transform: rotate(-3deg) translate(-2px, 1px); }
@@ -761,8 +764,13 @@ button, input, .card-slot, .card, .pile, .color-pick { touch-action: manipulatio
   from { opacity: 0; transform: translateY(90px) rotate(40deg); }
 }
 
-.turn-actions { display: flex; gap: 10px; }
+.turn-actions { display: flex; gap: 10px; position: relative; z-index: 2; }
 .turn-actions .btn { padding: 10px 26px; font-size: 15px; }
+
+/* telas largas: sem scroll horizontal, deixa as cartas respirarem (sem corte na base) */
+@media (min-width: 900px) {
+  .hand { overflow: visible; }
+}
 
 /* ============ LOG ============ */
 .log {
