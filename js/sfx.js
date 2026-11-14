@@ -146,6 +146,7 @@
       seq.forEach((f, i) => tone(f, 0.24, "triangle", 0.2, null, i * 0.16));
     },
     join() { if (!enabled) return; tone(700, 0.1, "sine", 0.2); tone(1050, 0.18, "sine", 0.16, null, 0.1); },
+    chat() { if (!enabled) return; tone(980, 0.07, "sine", 0.14); tone(1240, 0.1, "sine", 0.11, null, 0.07); },
     leave() { if (!enabled) return; tone(500, 0.12, "sine", 0.18); tone(320, 0.2, "sine", 0.16, null, 0.1); }
   };
 

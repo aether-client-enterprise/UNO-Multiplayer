@@ -14,6 +14,7 @@
 
   function go(name) {
     if (curScreen === name) return;
+    closeChat(); // o chat não deve ficar aberto por cima de outra tela
     global.UI.screen(name);
     curScreen = name;
   }
@@ -64,27 +65,38 @@
     lastMask = null;
     global.UI.clock = null;
     go("cover");
+    closeChat();
+    clearChatBadge();
     $("modal-color").classList.add("hidden");
     $("modal-round").classList.add("hidden");
     $("modal-score").classList.add("hidden");
     if (msg) global.UI.toast(msg);
   }
 
-  /* ---------- nome ---------- */
+  /* ---------- nome (fonte única: capa + perfil) ---------- */
   const inName = $("in-name");
-  inName.value = localStorage.getItem("uno_name") || "";
-  inName.addEventListener("change", () => localStorage.setItem("uno_name", inName.value.trim()));
+  const cleanName = v => String(v || "").replace(/[<>]/g, "").trim().slice(0, 14);
   function playerName() {
-    const n = inName.value.trim() || "Jogador";
+    const perfil = $("in-profile-name");
+    const n = cleanName(inName.value) || cleanName(perfil && perfil.value) || "Jogador";
     localStorage.setItem("uno_name", n);
+    localStorage.setItem("uno_profile_name", n);
+    inName.value = n;
+    if (perfil) perfil.value = n;
     return n;
   }
+  const savedName = cleanName(localStorage.getItem("uno_name")) || cleanName(localStorage.getItem("uno_profile_name"));
+  if (savedName) {
+    inName.value = savedName;
+    if ($("in-profile-name")) $("in-profile-name").value = savedName;
+  }
+  inName.addEventListener("change", () => playerName());
 
   /* ---------- perfil ---------- */
   const profWins = Number(localStorage.getItem("uno_wins") || 0);
   const profGames = Number(localStorage.getItem("uno_games") || 0);
   const profAvatar = localStorage.getItem("uno_avatar") || "av-red";
-  const profName = localStorage.getItem("uno_profile_name") || "";
+  const profName = localStorage.getItem("uno_profile_name") || localStorage.getItem("uno_name") || "";
 
   $("profile-wins").textContent = profWins;
   $("profile-games").textContent = profGames;
@@ -94,9 +106,11 @@
   $("in-profile-name").value = profName;
 
   $("bt-profile-save").addEventListener("click", () => {
-    const name = $("in-profile-name").value.trim() || "Jogador";
+    const name = cleanName($("in-profile-name").value) || "Jogador";
     const avatar = document.querySelector(".avatar-btn.selected")?.dataset.avatar || "av-red";
     localStorage.setItem("uno_profile_name", name);
+    localStorage.setItem("uno_name", name);
+    inName.value = name;
     localStorage.setItem("uno_avatar", avatar);
     localStorage.setItem("uno_wins", Number($("profile-wins").textContent));
     localStorage.setItem("uno_games", Number($("profile-games").textContent));
@@ -208,9 +222,8 @@
   $("bt-solo").addEventListener("click", () => {
     global.Sfx.unlock();
     global.Sfx.button();
-    const name = $("in-profile-name").value.trim() || "Jogador";
+    const name = playerName();
     const avatar = document.querySelector(".avatar-btn.selected")?.dataset.avatar || "av-red";
-    localStorage.setItem("uno_profile_name", name);
     localStorage.setItem("uno_avatar", avatar);
     mode = "local";
     Game.startLobby("local", name);
@@ -219,9 +232,8 @@
   $("bt-create").addEventListener("click", () => {
     global.Sfx.unlock();
     global.Sfx.button();
-    const name = $("in-profile-name").value.trim() || "Jogador";
+    const name = playerName();
     const avatar = document.querySelector(".avatar-btn.selected")?.dataset.avatar || "av-red";
-    localStorage.setItem("uno_profile_name", name);
     localStorage.setItem("uno_avatar", avatar);
     const btn = $("bt-create");
     btn.disabled = true;
@@ -359,8 +371,19 @@
 
   $("bt-next-round").addEventListener("click", () => {
     global.Sfx.button();
-    const isMatch = $("bt-next-round").dataset.match === "1";
-    act({ k: isMatch ? "rematch" : "nextRound" });
+    act({ k: "nextRound" });
+  });
+  $("bt-new-game").addEventListener("click", () => {
+    global.Sfx.button();
+    act({ k: "rematch" });
+  });
+  $("bt-to-lobby").addEventListener("click", () => {
+    global.Sfx.button();
+    act({ k: "backToLobby" });
+  });
+  $("bt-to-cover").addEventListener("click", () => {
+    global.Sfx.button();
+    leaveToCover("você saiu do jogo");
   });
 
   /* ---------- cor do curinga ---------- */
@@ -408,14 +431,15 @@
     if (!s || s.phase !== "lobby") return "a partida já começou";
     if (s.players.length >= 4) return "sala cheia — máximo 4 jogadores";
     const idx = s.players.length;
+    const displayName = cleanName(name) || ("Jogador " + (idx + 1));
     s.players.push({
       id: "p" + idx,
-      name: name || ("Jogador " + (idx + 1)),
+      name: displayName,
       bot: false, connected: true,
       hand: [], score: 0, uno: false, declaredUno: false,
       av: AVS[idx % 4]
     });
-    Game.log(name + " entrou na sala", "good");
+    Game.log(displayName + " entrou na sala", "good");
     global.Sfx.join();
     Game.fire();
     return idx;
@@ -442,58 +466,119 @@
     global.UI.toast("rede: " + ((e && (e.type || e.message)) || "erro"));
   };
 
-  /* ---------- sistema de chat ---------- */
-  // carregar mensagens salvas
+  /* ---------- chat da sala + notificações ---------- */
+  const CHAT_KEY = "uno_chat_msgs";
+  const escChat = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
   const loadChatMessages = () => {
-    const msgs = localStorage.getItem("uno_chat_msgs");
-    return msgs ? JSON.parse(msgs) : [];
+    try {
+      const msgs = JSON.parse(localStorage.getItem(CHAT_KEY) || "[]");
+      return Array.isArray(msgs) ? msgs.slice(-100) : [];
+    } catch (_) { return []; }
   };
-  const saveChatMessage = (name, text, avatar) => {
+  const saveChatMessages = msgs => {
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify(msgs.slice(-100))); } catch (_) {}
+  };
+  const pushChatMessage = msg => {
     const msgs = loadChatMessages();
-    msgs.push({ name, text, avatar, time: new Date().toLocaleTimeString() });
-    localStorage.setItem("uno_chat_msgs", JSON.stringify(msgs));
+    msgs.push(msg);
+    saveChatMessages(msgs);
+    return msgs;
   };
-  // renderizar mensagens no DOM
-  const renderChatMessages = (msgs) => {
+  const renderChatMessages = msgs => {
     const area = $("chat-messages");
     if (!area) return;
-    area.innerHTML = msgs.map(m => `<div style="margin: 4px 0; padding: 4px 8px; border-radius: 10px; background: rgba(255,212,94,.2);">
-      <span style="color: var(--gold); font-size: 10px;">${m.time}</span> ${m.name}: ${m.text}</div>`).join("");
+    area.innerHTML = msgs.map(m =>
+      '<div class="chat-line' + (m.own ? " own" : "") + '">' +
+      '<span class="chat-time">' + escChat(m.time || "") + "</span>" +
+      '<span class="chat-name">' + escChat(m.name || "Jogador") + "</span>: " +
+      escChat(m.text || "") + "</div>"
+    ).join("");
+    const box = $("chat-area");
+    if (box) box.scrollTop = box.scrollHeight;
   };
-  // toggle chat modal
+
   let chatVisible = false;
-  // event listeners for chat buttons
-  $("chat-btn").addEventListener("click", () => {
-    global.Sfx.button();
-    chatVisible = !chatVisible;
-    const panel = $("chat-modal");
-    if (chatVisible) {
-      panel.classList.remove("hidden");
-      renderChatMessages(loadChatMessages());
-    } else {
-      panel.classList.add("hidden");
-    }
-  });
-  $("chat-close").addEventListener("click", () => {
-    global.Sfx.button();
+  let chatUnread = 0;
+
+  function chatNotifyEnabled() {
+    return localStorage.getItem("uno_chat_notify") !== "off";
+  }
+  function clearChatBadge() {
+    chatUnread = 0;
+    const b = $("chat-badge");
+    if (b) { b.classList.add("hidden"); b.textContent = "+0"; }
+  }
+  function bumpChatBadge() {
+    chatUnread += 1;
+    const b = $("chat-badge");
+    if (!b) return;
+    b.textContent = "+" + chatUnread;
+    b.classList.remove("hidden");
+    // reinicia a animação de entrada a cada mensagem
+    b.style.animation = "none";
+    void b.offsetWidth;
+    b.style.animation = "";
+  }
+  function openChat() {
+    chatVisible = true;
+    $("chat-modal").classList.remove("hidden");
+    renderChatMessages(loadChatMessages());
+    clearChatBadge();
+    $("chat-input").focus();
+  }
+  function closeChat() {
     chatVisible = false;
     $("chat-modal").classList.add("hidden");
-  });
-  $("chat-send").addEventListener("click", () => {
+  }
+
+  $("chat-btn").addEventListener("click", () => {
     global.Sfx.button();
+    if (chatVisible) closeChat(); else openChat();
+  });
+  $("chat-close").addEventListener("click", () => { global.Sfx.button(); closeChat(); });
+
+  const chatNotify = $("chat-notify");
+  if (chatNotify) {
+    chatNotify.checked = chatNotifyEnabled();
+    chatNotify.addEventListener("change", () => {
+      localStorage.setItem("uno_chat_notify", chatNotify.checked ? "on" : "off");
+      if (!chatNotify.checked) clearChatBadge();
+    });
+  }
+
+  function sendChat() {
     const input = $("chat-input");
     const text = input.value.trim();
     if (!text) return;
-    // get current player name
     const m = Game.state;
-    const name = m ? (m.players[m.me] ? m.players[m.me].name : "Jogador") : "Jogador";
-    const avatar = m ? (m.players[m.me] ? m.players[m.me].av : "av-red") : "av-red";
-    saveChatMessage(name, text, avatar);
-    renderChatMessages(loadChatMessages());
+    const me = m ? m.players[m.me] : null;
+    const name = me ? me.name : playerName();
+    const av = (me && me.av) || "av-red";
+    pushChatMessage({ name: name, text: text, av: av, time: new Date().toLocaleTimeString(), own: true });
+    global.Net.sendChat(text, name, av);
+    if (chatVisible) renderChatMessages(loadChatMessages());
     input.value = "";
-  });
-  // allow pressing Enter to send
-  $("chat-input").addEventListener("keydown", e => { if (e.key === "Enter") $("chat-send").click(); });
+    input.focus();
+  }
+  $("chat-send").addEventListener("click", () => { global.Sfx.button(); sendChat(); });
+  $("chat-input").addEventListener("keydown", e => { if (e.key === "Enter") sendChat(); });
+
+  global.Net.onChat = msg => {
+    const line = {
+      name: msg.name || "Jogador",
+      text: msg.text || "",
+      av: msg.av || "av-red",
+      time: new Date().toLocaleTimeString(),
+      own: false
+    };
+    pushChatMessage(line);
+    if (chatVisible) {
+      renderChatMessages(loadChatMessages());
+    } else if (chatNotifyEnabled()) {
+      bumpChatBadge();
+      global.Sfx.chat();
+    }
+  };
 
   /* ---------- voz real entre jogadores (WebRTC + sinalização MQTT) ---------- */
   const Voice = {

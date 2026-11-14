@@ -300,12 +300,29 @@
       this.scheduleBot();
     },
 
-    /* ---------- ações ---------- */
+    /* rastreia se o convidado já aprovou o início */
     act(seat, a) {
       const s = this.state;
       if (!s) return;
       if (a.k === "start") {
-        if (s.phase === "lobby" && s.players.length >= 2 && seat === 0) { s.round = 1; for (const p of s.players) p.score = 0; this.startRound(); }
+        // modo local: anfitrião pode começar sozinho
+        if (s.mode === "local" && seat === 0 && s.players.length >= 2) { s.round = 1; for (const p of s.players) p.score = 0; this.startRound(); return; }
+        // multiplayer: inicia se houver 2 jogadores humanos (host + guest real)
+        if (s.phase === "lobby" && s.players.length >= 2 && seat === 0) {
+      // conta jogadores humanos (não-bot)
+      const humanos = s.players.filter(p => !p.bot).length;
+      if (humanos >= 2) {
+        // ambos presentes: pode começar imediatamente
+        s.round = 1; for (const p of s.players) p.score = 0; this.startRound();
+      } else if (humanos === 1) {
+        // apenas host humano: marcarei consentimento e aguarda guest se juntar
+        if (!s.consensoHost) s.consensoHost = true;
+        if (s.consensoHost && s.consensoGuest) {
+          s.round = 1; for (const p of s.players) p.score = 0; this.startRound();
+        }
+      }
+      return;
+        }
         return;
       }
       if (a.k === "bot" && seat === 0 && s.phase === "lobby") return this.addBot();
@@ -317,6 +334,10 @@
       }
       if (a.k === "rematch") {
         if (s.phase === "matchover" && seat === 0) { s.round = 1; for (const p of s.players) p.score = 0; this.startRound(); }
+        return;
+      }
+      if (a.k === "backToLobby") {
+        if (s.phase === "matchover" && seat === 0) this.backToLobby();
         return;
       }
       // UNO pode ser declarado fora da própria vez (a janela de carência continua)
@@ -333,6 +354,39 @@
     startRoundNext() {
       this.state.round += 1;
       this.startRound();
+    },
+
+    /* volta ao lobby da sala (mantém jogadores, zera placar e cartas) */
+    backToLobby() {
+      const s = this.state;
+      if (!s) return;
+      this.clearTimers();
+      this.clearGameTimer();
+      s.phase = "lobby";
+      s.round = 1;
+      s.turn = 0;
+      s.dir = 1;
+      s.color = null;
+      s.top = null;
+      s.draw = [];
+      s.discard = [];
+      s.drawnThisTurn = false;
+      s.turnStartedAt = null;
+      s.grace = null;
+      s.winner = null;
+      s.roundPts = null;
+      s.last = null;
+      s.log = [];
+      s.consensoHost = false;
+      s.consensoGuest = false;
+      for (const p of s.players) {
+        p.hand = [];
+        p.score = 0;
+        p.uno = false;
+        p.declaredUno = false;
+      }
+      this.log("de volta à sala — preparem-se!", "good");
+      this.fire();
     },
 
     playCard(seat, cardId, chosenColor) {
@@ -449,23 +503,20 @@
     declareUno(seat) {
       const s = this.state;
       const p = s.players[seat];
-      if (s.grace && s.grace.seat === seat) {
+      if (!p) return;
+      const inGrace = !!(s.grace && s.grace.seat === seat);
+      // pode gritar com 2 (antes de jogar) ou com 1 carta na mão (depois de jogar)
+      if (!inGrace && p.hand.length !== 1 && p.hand.length !== 2) return this.reject(seat);
+      if (p.uno) return; // já falou UNO nesta rodada
+      if (inGrace) {
         // chegou a tempo: cancela a penalidade
         clearTimeout(s.grace.timer);
         s.grace = null;
-        p.uno = true;
-        this.log(p.name + " falou UNO!", "good");
-        Sfx.uno();
-        this.fire();
-        return;
       }
-      if (p.hand.length !== 2) return this.reject(seat);
-      p.declaredUno = true;
       p.uno = true;
-      this.log(p.name + " está com UNO!", "good");
+      p.declaredUno = p.hand.length === 2; // pré-declarou: vale ao baixar para 1
+      this.log(p.name + " falou UNO!", "good");
       Sfx.uno();
-      // após declarar UNO, liberar jogadas novamente imediatamente
-      s.drawnThisTurn = false;
       this.fire();
     },
 

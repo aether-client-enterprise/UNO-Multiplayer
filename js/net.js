@@ -127,6 +127,7 @@
     onPeerLeave: null, // host: jogador caiu (índice)
     onAction: null,    // host: ação validada de um convidado
     onVoice: null,     // todos: status de microfone / sinal WebRTC
+    onChat: null,      // todos: mensagem de chat de outro jogador
 
     /* ---------------- anfitrião ---------------- */
     host(name, cb, attempt) {
@@ -149,7 +150,7 @@
             if (client !== this.client) return; // conexão velha
             this._offlined = false;
             try { client.options.reconnectPeriod = 2000; } catch (_) {}
-            client.subscribe([b + "/join", b + "/act/#", b + "/presence/#", b + "/voice/#"], { qos: 1 }, () => {
+            client.subscribe([b + "/join", b + "/act/#", b + "/presence/#", b + "/voice/#", b + "/chat"], { qos: 1 }, () => {
               this.pub(b + "/meta", this._maskFn
                 ? { phase: this._maskFn(0).phase, n: this._maskFn(0).players.length }
                 : { phase: "lobby", n: 1 }, true);
@@ -172,6 +173,26 @@
       const b = base(this.code);
       if (t.indexOf(b + "/voice/") === 0) {
         this.routeVoice(t.slice((b + "/voice/").length), p);
+        return;
+      }
+      if (t === b + "/chat") {
+        this.routeChat(p);
+        return;
+      }
+      if (t === b + "/consensoStart") {
+        const m = parse(p);
+        if (!m) return;
+        // host: recebeu resposta do guest
+        if (seat === 0) {
+          if (m.ok) { s.consensoGuest = true; }
+        } else {
+          // guest: responde confirmando
+          this.pub(b + "/consensoStart", { from: this.cid, ok: true }, false);
+          s.consensoGuest = true;
+        }
+        if (s.consensoHost && s.consensoGuest) {
+          if (global.Net.onState) global.Net.onState(Game.state);
+        }
         return;
       }
       if (t === b + "/join") {
@@ -266,7 +287,8 @@
               b + "/hello/" + cid,
               b + "/state/" + cid,
               b + "/meta",
-              b + "/voice/#"
+              b + "/voice/#",
+              b + "/chat"
             ], { qos: 1 }, () => {
               this.pub(b + "/presence/" + cid, "1", true);
               this.pub(b + "/join", { n: cid, name: name }, false);
@@ -282,6 +304,10 @@
             if (client !== this.client) return;
             if (t.indexOf(b + "/voice/") === 0) {
               this.routeVoice(t.slice((b + "/voice/").length), p);
+              return;
+            }
+            if (t === b + "/chat") {
+              this.routeChat(p);
               return;
             }
             if (t === b + "/meta") {
@@ -350,6 +376,31 @@
     voiceSignal(to, obj) {
       if (!this.client || !this.cid || !to) return;
       this.pub(base(this.code) + "/voice/sig/" + to, Object.assign({ from: this.cid }, obj), false);
+    },
+
+    /* ---------------- chat da sala ----------------
+       chat   todos -> todos   {from, name, av, text} (sem retenção) */
+    routeChat(p) {
+      const m = parse(p);
+      if (!m || !m.text) return;
+      if (m.from && m.from === this.cid) return; // o broker devolve a própria mensagem
+      this.onChat && this.onChat({
+        from: String(m.from || ""),
+        name: String(m.name || "Jogador").replace(/[<>]/g, "").slice(0, 14) || "Jogador",
+        av: String(m.av || "av-red"),
+        text: String(m.text).slice(0, 120)
+      });
+    },
+
+    sendChat(text, name, av) {
+      if (!this.client || !this.cid || !this.code) return false;
+      this.pub(base(this.code) + "/chat", {
+        from: this.cid,
+        name: String(name || this.myName || "Jogador").replace(/[<>]/g, "").slice(0, 14) || "Jogador",
+        av: String(av || "av-red"),
+        text: String(text || "").slice(0, 120)
+      }, false);
+      return true;
     },
 
     /* ---------------- transporte ---------------- */

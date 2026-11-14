@@ -41,6 +41,9 @@
     lobby(kind, m) {
       // kind: 'local' | 'host' | 'guest'
       const players = m.players;
+      // ao voltar para a sala, nenhum modal da mesa deve continuar na frente
+      $("modal-round").classList.add("hidden");
+      $("modal-color").classList.add("hidden");
       $("lobby-title").textContent =
         kind === "local" ? "contra o computador" : kind === "host" ? "sua sala" : "sala";
       $("lobby-code-block").classList.toggle("hidden", kind === "local");
@@ -205,7 +208,11 @@
 
       const mine = m.players[me];
       const unoBtn = $("bt-uno");
-      unoBtn.disabled = !(mine && ((mine.hand && mine.hand.length === 2) || m.grace != null));
+      const myCount = mine && mine.hand ? mine.hand.length : 0;
+      const said = !!(mine && mine.uno);
+      const canUno = !!(mine && !said && (myCount === 1 || myCount === 2 || m.grace != null));
+      unoBtn.disabled = !canUno;
+      unoBtn.classList.toggle("said", said && myCount === 1);
 
       /* --- ícones de chat e voz: sempre acessíveis --- */
       const chatBtn = $("chat-btn");
@@ -220,7 +227,6 @@
       if (m.grace != null) {
         this.graceEnd = Date.now() + m.grace;
         ut.classList.remove("hidden");
-        unoBtn.disabled = false;
       } else {
         ut.classList.add("hidden");
       }
@@ -385,8 +391,11 @@
         list.appendChild(row);
       });
       $("round-points").textContent = "cartas restantes valem pontos — quem zera leva a soma.";
+      $("bt-new-game").classList.add("hidden");
+      $("bt-to-lobby").classList.add("hidden");
+      $("bt-to-cover").classList.add("hidden");
       const btn = $("bt-next-round");
-      btn.dataset.match = "";
+      btn.classList.remove("hidden");
       const canNext = m.me === 0 || m.me === m.winner;
       btn.disabled = !canNext;
       btn.textContent = canNext ? "próxima rodada" : "aguardando " + m.players[0].name;
@@ -398,11 +407,17 @@
       $("round-title").textContent = m.winner === m.me ? "você venceu a partida!" :
         m.winner == null ? "empate por tempo!" :
         esc(m.players[m.winner].name) + " venceu a partida";
-      $("round-points").textContent = "placar final — meta de " + m.target + " pontos.";
-      const btn = $("bt-next-round");
-      btn.disabled = m.me !== 0;
-      btn.textContent = m.me === 0 ? "novo jogo" : "aguardando " + m.players[0].name;
-      btn.dataset.match = "1";
+      const isHost = m.me === 0;
+      $("round-points").textContent = "placar final — meta de " + m.target + " pontos." +
+        (isHost ? "" : " só o anfitrião pode reiniciar.");
+      $("bt-next-round").classList.add("hidden");
+      $("bt-new-game").classList.remove("hidden");
+      $("bt-to-lobby").classList.remove("hidden");
+      $("bt-to-cover").classList.remove("hidden");
+      $("bt-new-game").disabled = !isHost;
+      $("bt-to-lobby").disabled = !isHost;
+      $("bt-new-game").textContent = isHost ? "novo jogo" : "novo jogo (host)";
+      $("bt-to-lobby").textContent = isHost ? "voltar à sala" : "voltar à sala (host)";
     },
 
     scoreboard(m) {
