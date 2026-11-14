@@ -200,16 +200,13 @@
       const unoBtn = $("bt-uno");
       unoBtn.disabled = !(mine && ((mine.hand && mine.hand.length === 2) || m.grace != null));
 
-      /* --- ícones de chat e voz --- */
+      /* --- ícones de chat e voz: sempre acessíveis --- */
       const chatBtn = $("chat-btn");
       const voiceBtn = $("voice-btn");
+      if (chatBtn) chatBtn.disabled = false;
+      if (voiceBtn) voiceBtn.disabled = false;
       const chatPanel = $("chat-panel");
-      const chatInput = $("chat-input");
-      const chatSend = $("chat-send");
-      const chatMessages = $("chat-messages");
-      chatBtn.disabled = !myTurn;
-      voiceBtn.disabled = !myTurn;
-      chatPanel.classList.add("hidden");
+      if (chatPanel) chatPanel.classList.add("hidden");
 
       /* --- janela do UNO --- */
       const ut = $("uno-timer");
@@ -363,6 +360,7 @@
     roundModal(m) {
       $("modal-round").classList.remove("hidden");
       $("round-title").textContent = m.winner === m.me ? "você venceu a rodada!" :
+        m.winner == null ? "empate!" :
         esc(m.players[m.winner].name) + " venceu a rodada";
       const list = $("round-list");
       list.innerHTML = "";
@@ -391,6 +389,7 @@
       // reusa o modal de rodada com título de partida
       this.roundModal(m);
       $("round-title").textContent = m.winner === m.me ? "você venceu a partida!" :
+        m.winner == null ? "empate por tempo!" :
         esc(m.players[m.winner].name) + " venceu a partida";
       $("round-points").textContent = "placar final — meta de " + m.target + " pontos.";
       const btn = $("bt-next-round");

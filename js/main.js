@@ -292,7 +292,7 @@
     renderFriendsList(loadFriends());
     go("friends");
   }
-  $("bt-friends").addEventListener("click", () => openFriends("lobby"));
+  $("bt-friends").addEventListener("click", () => openFriends(curScreen || "cover"));
   $("bt-friends-cover").addEventListener("click", () => openFriends("cover"));
   $("bt-friends-back").addEventListener("click", () => {
     global.Sfx.button();
@@ -453,26 +453,13 @@
   };
   // renderizar mensagens no DOM
   const renderChatMessages = (msgs) => {
-    const area = $("#chat-messages");
+    const area = $("chat-messages");
     if (!area) return;
     area.innerHTML = msgs.map(m => `<div style="margin: 4px 0; padding: 4px 8px; border-radius: 10px; background: rgba(255,212,94,.2);">
       <span style="color: var(--gold); font-size: 10px;">${m.time}</span> ${m.name}: ${m.text}</div>`).join("");
   };
   // toggle chat modal
   let chatVisible = false;
-  $("bt-friends").addEventListener("click", () => { global.Sfx.button(); go("friends"); });
-  $("bt-friends-cover").addEventListener("click", () => openFriends("cover"));
-  $("bt-friends-back").addEventListener("click", () => {
-    global.Sfx.button();
-    go(friendsReturn || "cover");
-  });
-  $("bt-add-friend").addEventListener("click", () => {
-    global.Sfx.button();
-    const v = $("in-add-friend").value.trim();
-    if (!v) { global.UI.toast("digite um código de 6 caracteres ou um nome"); return; }
-    addFriend(v.toUpperCase());
-    $("in-add-friend").value = "";
-  });
   // event listeners for chat buttons
   $("chat-btn").addEventListener("click", () => {
     global.Sfx.button();

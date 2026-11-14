@@ -130,7 +130,7 @@
     /* ---------- novo: timer de 10s por turno ---------- */
     gameTimer: null,
     gameStartTime: null,
-    GAME_TIME_MS: number = 5 * 60 * 1000,  // 5 minutos
+    GAME_TIME_MS: 5 * 60 * 1000,  // 5 minutos
     turnTimer: null,
     TURN_LIMIT_MS: 10000,  // 10 segundos
 
@@ -618,27 +618,23 @@
     endGameByTime() {
       const s = this.state;
       if (!s) return;
-      let winnerSeat = null;
       let minCards = Infinity;
-      for (const p of s.players) {
-        if (p.hand.length < minCards) {
-          minCards = p.hand.length;
-          winnerSeat = s.players.indexOf(p);
-        }
-      }      if (winnerSeat !== null && winnerSeat !== -1) {
-        const winner = s.players[winnerSeat];
-        s.phase = "matchover";
+      for (const p of s.players) minCards = Math.min(minCards, p.hand.length);
+      const leaders = s.players.filter(p => p.hand.length === minCards);
+      this.clearTimers();
+      s.phase = "matchover";
+      if (leaders.length === 1) {
+        const winnerSeat = s.players.indexOf(leaders[0]);
         s.winner = winnerSeat;
-        s.last = { kind: "match", text: winner.name + " venceu por tempo! (menos cartas)" };
-        this.log(winner.name + " venceu por tempo! (menos cartas)", "good");
-        this.fire();
+        s.last = { kind: "match", text: leaders[0].name + " venceu por tempo! (menos cartas)" };
+        this.log(leaders[0].name + " venceu por tempo! (menos cartas)", "good");
       } else {
-        s.phase = "matchover";
-        s.winner = 0;
-        s.last = { kind: "match", text: "Empate! Todos tiveram mesma quantidade de cartas." };
-        this.log("Empate! Todos tiveram mesma quantidade de cartas.", "good");
-        this.fire();
+        s.winner = null;
+        const nomes = leaders.map(p => p.name).join(", ");
+        s.last = { kind: "match", text: "Empate por tempo! " + nomes + " com " + minCards + " cartas." };
+        this.log("Empate por tempo! " + nomes + " com " + minCards + " cartas.", "good");
       }
+      this.fire();
     },
     /* ---------- máscara por espectador (não vaza mão dos outros) ---------- */
     mask(viewer) {
