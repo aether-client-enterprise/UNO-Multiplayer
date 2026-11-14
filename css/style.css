@@ -368,6 +368,16 @@ button, input, .card-slot, .card, .pile, .color-pick { touch-action: manipulatio
   letter-spacing: 1px;
 }
 .hud-turn.mine { color: var(--gold); animation: blink 1.1s ease-in-out infinite; }
+.hud-center { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.turn-clock {
+  min-height: 15px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: rgba(255,255,255,.6);
+}
+.turn-clock.low { color: #ff5544; animation: blink .7s ease-in-out infinite; }
+.hud-chip.low { color: #ff5544; border-color: rgba(255,85,68,.7); }
 @keyframes blink { 50% { opacity: .55; } }
 .hud-btn {
   background: rgba(0,0,0,.55);
@@ -378,6 +388,11 @@ button, input, .card-slot, .card, .pile, .color-pick { touch-action: manipulatio
   font-size: 13px;
 }
 .hud-btn:hover { border-color: var(--gold); color: var(--gold); }
+.hud-btn.on {
+  border-color: #3ddc84;
+  color: #3ddc84;
+  box-shadow: 0 0 12px rgba(61,220,132,.55);
+}
 
 /* oponentes */
 .opponents {
@@ -729,6 +744,7 @@ button, input, .card-slot, .card, .pile, .color-pick { touch-action: manipulatio
 .hand {
   display: flex;
   justify-content: center;
+  justify-content: safe center; /* com muitas cartas, permite rolar até a primeira */
   align-items: flex-end;
   min-height: calc(var(--card-h) + 46px);
   max-width: 96vw;
@@ -923,10 +939,11 @@ button, input, .card-slot, .card, .pile, .color-pick { touch-action: manipulatio
   .hud-left, .hud-right { gap: 5px; flex-wrap: wrap; justify-content: center; }
   .hud-chip { font-size: 11px; padding: 4px 9px; }
   .hud-btn { font-size: 12px; padding: 6px 11px; }
-  .hud-turn { font-size: 15px; order: -1; width: 100%; text-align: center; }
+  .hud-turn { font-size: 15px; text-align: center; }
+  .hud-center { order: -1; width: 100%; }
   .dir-badge { width: 32px; height: 32px; font-size: 17px; }
 
-  .opponents { top: 92px; gap: 10px; }
+  .opponents { top: 132px; gap: 10px; }
   .opponent .avatar { width: 38px; height: 38px; font-size: 16px; }
   .opponent .o-name { max-width: 84px; font-size: 11px; }
   .opponent .o-score { font-size: 10px; }
@@ -939,7 +956,7 @@ button, input, .card-slot, .card, .pile, .color-pick { touch-action: manipulatio
   .turn-banner { font-size: 21px; padding: 10px 22px; }
   .turn-actions .btn { padding: 12px 24px; }
   .uno-btn { width: 68px; height: 52px; font-size: 15px; }
-  .hand { padding: 42px 12px 4px; }
+  .hand { padding: 42px 8px 4px; max-width: 100vw; }
   .log { max-width: 160px; bottom: 4px; left: 6px; }
   .log-line { font-size: 11px; padding: 4px 8px; }
 

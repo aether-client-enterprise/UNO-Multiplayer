@@ -126,6 +126,7 @@
     onPeerJoin: null,  // host: pediu entrada -> assento | string de erro | -1
     onPeerLeave: null, // host: jogador caiu (índice)
     onAction: null,    // host: ação validada de um convidado
+    onVoice: null,     // todos: status de microfone / sinal WebRTC
 
     /* ---------------- anfitrião ---------------- */
     host(name, cb, attempt) {
@@ -148,7 +149,7 @@
             if (client !== this.client) return; // conexão velha
             this._offlined = false;
             try { client.options.reconnectPeriod = 2000; } catch (_) {}
-            client.subscribe([b + "/join", b + "/act/#", b + "/presence/#"], { qos: 1 }, () => {
+            client.subscribe([b + "/join", b + "/act/#", b + "/presence/#", b + "/voice/#"], { qos: 1 }, () => {
               this.pub(b + "/meta", this._maskFn
                 ? { phase: this._maskFn(0).phase, n: this._maskFn(0).players.length }
                 : { phase: "lobby", n: 1 }, true);
@@ -169,6 +170,10 @@
 
     hostMessage(t, p) {
       const b = base(this.code);
+      if (t.indexOf(b + "/voice/") === 0) {
+        this.routeVoice(t.slice((b + "/voice/").length), p);
+        return;
+      }
       if (t === b + "/join") {
         const m = parse(p);
         if (!m || !m.n) return;
@@ -203,6 +208,7 @@
         const e = this.seats.get(cid);
         if (!e) return;
         this.seats.delete(cid);
+        this.pub(b + "/voice/u/" + cid, "", true); // limpa status de voz de quem caiu
         // remove do mapa os assentos acima do que saiu (o engine faz splice no mesmo índice)
         for (const [k, v] of this.seats) if (v.seat > e.seat) v.seat -= 1;
         this.onPeerLeave && this.onPeerLeave(e.seat);
@@ -259,7 +265,8 @@
             client.subscribe([
               b + "/hello/" + cid,
               b + "/state/" + cid,
-              b + "/meta"
+              b + "/meta",
+              b + "/voice/#"
             ], { qos: 1 }, () => {
               this.pub(b + "/presence/" + cid, "1", true);
               this.pub(b + "/join", { n: cid, name: name }, false);
@@ -273,6 +280,10 @@
           client.on("connect", onReady);
           client.on("message", (t, p) => {
             if (client !== this.client) return;
+            if (t.indexOf(b + "/voice/") === 0) {
+              this.routeVoice(t.slice((b + "/voice/").length), p);
+              return;
+            }
             if (t === b + "/meta") {
               if (payloadStr(p).trim() === "") {
                 // host limpou o meta retido = sala morreu
@@ -309,6 +320,38 @@
       });
     },
 
+    /* ---------------- voz: sinalização WebRTC pelo mesmo MQTT ----------------
+       voice/u/{cid}      todos -> todos   retido {name} enquanto o microfone está ligado
+       voice/sig/{cid}    peer -> peer     {from, kind:"offer"|"answer"|"ice", sdp|candidate} */
+    routeVoice(suffix, p) {
+      if (suffix.indexOf("u/") === 0) {
+        const cid = suffix.slice(2);
+        const raw = payloadStr(p).trim();
+        if (!raw) { this.onVoice && this.onVoice({ kind: "user", cid: cid, on: false }); return; }
+        const m = parse(p);
+        this.onVoice && this.onVoice({ kind: "user", cid: cid, on: true, name: (m && m.name) || "Jogador" });
+        return;
+      }
+      if (suffix.indexOf("sig/") === 0) {
+        const to = suffix.slice(4);
+        if (to !== this.cid) return; // não é pra mim
+        const m = parse(p);
+        if (!m || !m.from) return;
+        this.onVoice && this.onVoice({ kind: "signal", from: String(m.from), data: m });
+      }
+    },
+
+    voicePublishUser(name, on) {
+      if (!this.client || !this.cid) return;
+      this.pub(base(this.code) + "/voice/u/" + this.cid,
+        on ? { name: String(name || this.myName || "Jogador").slice(0, 14) } : "", true);
+    },
+
+    voiceSignal(to, obj) {
+      if (!this.client || !this.cid || !to) return;
+      this.pub(base(this.code) + "/voice/sig/" + to, Object.assign({ from: this.cid }, obj), false);
+    },
+
     /* ---------------- transporte ---------------- */
     pub(topic, obj, retain) {
       if (!this.client) return;
@@ -342,11 +385,15 @@
         for (const cid of this.seats.keys()) {
           this.pub(b + "/state/" + cid, "", true);
           this.pub(b + "/hello/" + cid, "", true);
+          this.pub(b + "/voice/u/" + cid, "", true);
         }
       }
       if (this.role === "guest" && b && this.client) {
         this.pub(b + "/presence/" + this.cid, "", true);
-        if (this.cid) this.pub(b + "/state/" + this.cid, "", true);
+        if (this.cid) {
+          this.pub(b + "/state/" + this.cid, "", true);
+          this.pub(b + "/voice/u/" + this.cid, "", true);
+        }
       }
       this.seats.clear();
       this._maskFn = null;

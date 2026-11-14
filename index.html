@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UNO — cartas online</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23111'/%3E%3Cellipse cx='32' cy='32' rx='26' ry='16' fill='%23d92b1e' stroke='%23fff' stroke-width='3' transform='rotate(-8 32 32)'/%3E%3Ctext x='32' y='39' font-size='19' font-weight='900' font-style='italic' fill='%23fff' text-anchor='middle' font-family='Arial'%3EUNO%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
 
@@ -121,10 +121,14 @@
   <header class="hud">
     <div class="hud-left">
       <div id="hud-dir" class="dir-badge" title="sentido de jogo">&#8635;</div>
+      <div id="hud-time" class="hud-chip" title="tempo de jogo">5:00</div>
       <div id="hud-round" class="hud-chip">rodada 1</div>
       <div id="hud-target" class="hud-chip">meta 500</div>
     </div>
-    <div id="hud-turn" class="hud-turn">sua vez</div>
+    <div class="hud-center">
+      <div id="hud-turn" class="hud-turn">sua vez</div>
+      <div id="turn-clock" class="turn-clock"></div>
+    </div>
     <div class="hud-right">
       <button id="bt-sound2" class="hud-btn">som</button>
       <button id="bt-score" class="hud-btn">placar</button>
@@ -165,7 +169,6 @@
     <div id="my-hand" class="hand"></div>
     <div class="turn-actions">
       <button id="bt-draw" class="btn btn-blue" disabled>comprar</button>
-      <button id="bt-pass" class="btn btn-ghost" disabled>passar</button>
     </div>
   </div>
 
@@ -246,10 +249,10 @@
 
 <div id="toast" class="toast hidden"></div>
 
-<script src="js/sfx.js?v=3"></script>
-<script src="js/engine.js?v=3"></script>
-<script src="js/net.js?v=3"></script>
-<script src="js/ui.js?v=3"></script>
-<script src="js/main.js?v=3"></script>
+<script src="js/sfx.js?v=4"></script>
+<script src="js/engine.js?v=4"></script>
+<script src="js/net.js?v=4"></script>
+<script src="js/ui.js?v=4"></script>
+<script src="js/main.js?v=4"></script>
 </body>
 </html>

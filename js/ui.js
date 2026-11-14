@@ -114,6 +114,12 @@
       const me = m.me;
       const myTurn = m.phase === "playing" && m.turn === me;
 
+      // se o turno passou (inclusive por timeout), fecha a escolha de cor pendente
+      if (!myTurn && this.pendingWild) {
+        this.pendingWild = null;
+        $("modal-color").classList.add("hidden");
+      }
+
       /* --- transições de som --- */
       if (prev) {
         if (prev.phase !== "playing" && m.phase === "playing") {
@@ -147,6 +153,8 @@
       $("hud-round").textContent = "rodada " + m.round;
       $("hud-target").textContent = "meta " + m.target;
       $("hud-dir").classList.toggle("ccw", m.dir === -1);
+      this.clock = { at: Date.now(), timeLeft: m.timeLeft, turnLeft: m.turnLeft };
+      this.paintClock();
       const hudTurn = $("hud-turn");
       if (m.phase === "playing") {
         hudTurn.textContent = myTurn ? "sua vez" : "vez de " + m.players[m.turn].name;
@@ -194,7 +202,6 @@
 
       /* --- botões de turno --- */
       $("bt-draw").disabled = !myTurn || m.drawnThisTurn;
-      $("bt-pass").disabled = !myTurn || !m.drawnThisTurn;
 
       const mine = m.players[me];
       const unoBtn = $("bt-uno");
@@ -414,12 +421,45 @@
       $("modal-score").classList.remove("hidden");
     },
 
-    /* relógio da janela do UNO */
+    /* relógio do UNO, do tempo de jogo (5 min) e do turno (10 s) */
     tick() {
       const ut = $("uno-timer");
-      if (ut.classList.contains("hidden")) return;
-      const left = Math.max(0, Math.ceil((this.graceEnd - Date.now()) / 1000));
-      ut.textContent = left;
+      if (!ut.classList.contains("hidden")) {
+        const left = Math.max(0, Math.ceil((this.graceEnd - Date.now()) / 1000));
+        ut.textContent = left;
+      }
+      this.paintClock();
+    },
+
+    paintClock() {
+      const c = this.clock;
+      const hudTime = $("hud-time");
+      if (hudTime) {
+        const over = this.last && this.last.phase === "matchover";
+        if (over) {
+          hudTime.textContent = "fim";
+          hudTime.classList.remove("low");
+        } else if (!c || c.timeLeft == null) {
+          hudTime.textContent = "--:--";
+          hudTime.classList.remove("low");
+        } else {
+          const left = Math.max(0, c.timeLeft - (Date.now() - c.at));
+          const secs = Math.ceil(left / 1000);
+          hudTime.textContent = Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
+          hudTime.classList.toggle("low", left <= 30000);
+        }
+      }
+      const tc = $("turn-clock");
+      if (tc) {
+        const playing = this.last && this.last.phase === "playing";
+        if (c && c.turnLeft != null && playing) {
+          const left = Math.max(0, c.turnLeft - (Date.now() - c.at));
+          tc.textContent = Math.ceil(left / 1000) + "s";
+          tc.classList.toggle("low", left <= 3000);
+        } else {
+          tc.textContent = "";
+        }
+      }
     }
   };
 
@@ -448,9 +488,12 @@
     else if (kind === "reverse") { pip = "pip-reverse"; corner = "\u21C4"; }
     else if (kind === "draw2") { pip = "pip-draw2"; corner = "+2"; }
     else if (kind === "wild4") { pip = "pip-wild4"; corner = "+4"; }
+    // cartas numéricas: o número é o conteúdo do miolo; as de ação usam glifo via CSS
+    const pipCls = kind === "number" ? "" : pip;
+    const pipTxt = kind === "number" ? pip : "";
     d.innerHTML =
       '<span class="corner c-tl">' + corner + "</span>" +
-      '<div class="face"><div class="oval"><span class="pip ' + pip + '"></span></div></div>' +
+      '<div class="face"><div class="oval"><span class="pip ' + pipCls + '">' + pipTxt + "</span></div></div>" +
       '<span class="corner c-br">' + corner + "</span>";
     return d;
   }

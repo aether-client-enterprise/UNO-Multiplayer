@@ -130,6 +130,7 @@
     /* ---------- novo: timer de 10s por turno ---------- */
     gameTimer: null,
     gameStartTime: null,
+    gameRemaining: null,   // ms restantes quando o relógio é pausado entre rodadas
     GAME_TIME_MS: 5 * 60 * 1000,  // 5 minutos
     turnTimer: null,
     TURN_LIMIT_MS: 10000,  // 10 segundos
@@ -139,6 +140,7 @@
       this.mode = mode;
       this.mySeat = 0;
       this.clearTimers();
+      this.clearGameTimer();
       this.state = {
         phase: "lobby",
         players: [{
@@ -149,6 +151,8 @@
         color: null, top: null, topRot: 0,
         draw: [], discard: [],
         drawnThisTurn: false,
+        turnStartedAt: null,  // início do turno atual (contagem de 10s)
+        turnLimit: this.TURN_LIMIT_MS,
         grace: null,          // {seat, until}
         log: [], last: null,  // last: {kind, text}
         winner: null, roundPts: null
@@ -212,6 +216,7 @@
         }
         if (s.grace && s.grace.seat === idx) { clearTimeout(s.grace.timer); s.grace = null; }
         else if (s.grace && s.grace.seat > idx) s.grace.seat -= 1;
+        this.startTurnTimer();
         this.scheduleBot();
       } else if (s.phase === "roundover" || s.phase === "matchover") {
         if (idx < s.turn) s.turn = Math.max(0, s.turn - 1);
@@ -228,22 +233,40 @@
 
     startTurnTimer() {
       const s = this.state;
-      if (!s || s.phase !== "playing" || s.turn === null) return;
       this.clearTurnTimer();
+      if (!s || s.phase !== "playing" || s.turn === null) return;
+      const seat = s.turn;
+      s.turnStartedAt = Date.now();
+      s.turnLimit = this.TURN_LIMIT_MS;
       this.turnTimer = setTimeout(() => {
-        if (this.state && this.state.turn === s.turn) {
-          this.turnAdvance(1);
-        }
+        if (this.state !== s) return;
+        if (s.phase !== "playing" || s.turn !== seat) return;
+        this.autoPlay(seat);
       }, this.TURN_LIMIT_MS);
+    },
+
+    /* o jogador demorou mais de 10s: joga a melhor carta ou compra e passa */
+    autoPlay(seat) {
+      const s = this.state;
+      if (!s || s.phase !== "playing" || s.turn !== seat) return;
+      const p = s.players[seat];
+      if (!p) return;
+      const pick = botPick(p.hand, s.top, s.color);
+      if (pick) {
+        const color = (pick.kind === "wild" || pick.kind === "wild4") ? botChooseColor(p.hand) : null;
+        this.act(seat, { k: "play", id: pick.id, color: color });
+      } else {
+        this.act(seat, { k: "draw" }); // compra e passa automaticamente
+      }
     },
 
     /* ---------- rodada ---------- */
     startRound() {
       const s = this.state;
       this.clearTimers();
-      this.clearGameTimer();
-      this.startGameTimer();
       s.phase = "playing";
+      // relógio de 5 min da partida: continua de onde parou entre rodadas
+      if (!this.gameTimer) this.startGameTimer();
       s.dir = 1;
       s.color = null;
       s.top = null;
@@ -272,6 +295,7 @@
       s.turn = Math.floor(Math.random() * s.players.length);
       s.last = { kind: "start", text: "rodada " + s.round + " começou" };
       this.log("rodada " + s.round + " — boa sorte!", "good");
+      this.startTurnTimer();
       this.fire();
       this.scheduleBot();
     },
@@ -304,7 +328,6 @@
 
       if (a.k === "play") return this.playCard(seat, a.id, a.color);
       if (a.k === "draw") return this.drawCard(seat);
-      if (a.k === "pass") return this.passTurn(seat);
     },
 
     startRoundNext() {
@@ -398,27 +421,18 @@
 
     drawCard(seat) {
       const s = this.state;
+      if (s.phase !== "playing" || s.turn !== seat) return this.reject(seat);
       if (s.drawnThisTurn) return this.reject(seat);
       const p = s.players[seat];
       const card = this.takeOne();
       if (!card) return this.reject(seat);
       p.hand.push(card);
-      s.drawnThisTurn = true;
-      s.last = { kind: "draw", text: p.name + " comprou uma carta" };
-      this.log(p.name + " comprou uma carta", null);
+      s.drawnThisTurn = false;
+      s.last = { kind: "draw", text: p.name + " comprou e passou" };
+      this.log(p.name + " comprou uma carta e passou a vez", null);
       p.uno = false;
       p.declaredUno = false;
-      this.fire();
-      this.scheduleBot();
-    },
-
-    passTurn(seat) {
-      const s = this.state;
-      if (!s.drawnThisTurn) return this.reject(seat);
-      s.drawnThisTurn = false;
-      s.last = { kind: "pass", text: s.players[seat].name + " passou" };
-      this.log(s.players[seat].name + " passou a vez", null);
-      this.turnAdvance(1);
+      this.turnAdvance(1); // comprou: passa automaticamente (sem chance de jogar a comprada)
       this.fire();
       this.scheduleBot();
     },
@@ -457,7 +471,7 @@
       const n = s.players.length;
       s.turn = ((s.turn + steps * s.dir) % n + n) % n;
       s.drawnThisTurn = false;
-      this.clearTurnTimer();
+      this.startTurnTimer(); // reinicia a contagem de 10s do próximo jogador
     },
 
     give(seat, count) {
@@ -504,6 +518,7 @@
     endRound(seat, lastCard) {
       const s = this.state;
       this.clearTimers();
+      this.pauseGameTimer();
       s.grace = null;
       let pts = 0;
       for (const p of s.players) for (const c of p.hand) pts += cardPoints(c);
@@ -515,6 +530,7 @@
       this.log(s.players[seat].name + " venceu a rodada (+" + pts + " pts)", "good");
 
       if (s.players[seat].score >= TARGET) {
+        this.clearGameTimer();
         s.phase = "matchover";
         this.log(s.players[seat].name + " venceu a partida!", "good");
         s.last = { kind: "match", text: s.players[seat].name + " venceu a partida" };
@@ -564,28 +580,14 @@
 
     botTurn(seat) {
       const s = this.state;
+      if (!s || s.phase !== "playing" || s.turn !== seat) return;
       const p = s.players[seat];
       const pick = botPick(p.hand, s.top, s.color);
       if (pick) {
         const color = (pick.kind === "wild" || pick.kind === "wild4") ? botChooseColor(p.hand) : null;
         this.act(seat, { k: "play", id: pick.id, color: color });
-      } else if (!s.drawnThisTurn) {
-        this.act(seat, { k: "draw" });
-        // comprou: joga se der, senão passa
-        const t2 = setTimeout(() => {
-          if (this.state.phase !== "playing" || this.state.turn !== seat) return;
-          const p2 = this.state.players[seat];
-          const again = botPick(p2.hand, s.top, s.color);
-          if (again) {
-            const col = (again.kind === "wild" || again.kind === "wild4") ? botChooseColor(p2.hand) : null;
-            this.act(seat, { k: "play", id: again.id, color: col });
-          } else {
-            this.act(seat, { k: "pass" });
-          }
-        }, 550);
-        this.timers.push(t2);
       } else {
-        this.act(seat, { k: "pass" });
+        this.act(seat, { k: "draw" }); // compra e passa automaticamente
       }
     },
 
@@ -603,21 +605,41 @@
       if (this.gameTimer) clearTimeout(this.gameTimer);
       this.gameTimer = null;
       this.gameStartTime = null;
+      this.gameRemaining = null;
+    },
+
+    gameTimeLeft() {
+      if (this.gameStartTime) {
+        return Math.max(0, (this.gameRemaining == null ? this.GAME_TIME_MS : this.gameRemaining) - (Date.now() - this.gameStartTime));
+      }
+      return this.gameRemaining == null ? null : this.gameRemaining;
+    },
+
+    pauseGameTimer() {
+      if (!this.gameTimer) return;
+      this.gameRemaining = this.gameTimeLeft();
+      clearTimeout(this.gameTimer);
+      this.gameTimer = null;
+      this.gameStartTime = null;
     },
 
     startGameTimer() {
       const s = this.state;
       if (!s || s.phase !== "playing") return;
-      this.clearGameTimer();
+      if (this.gameRemaining == null) this.gameRemaining = this.GAME_TIME_MS;
+      if (this.gameTimer) clearTimeout(this.gameTimer);
       this.gameStartTime = Date.now();
       this.gameTimer = setTimeout(() => {
+        this.gameTimer = null;
+        this.gameStartTime = null;
         this.endGameByTime();
-      }, this.GAME_TIME_MS);
+      }, Math.max(0, this.gameRemaining));
     },
 
     endGameByTime() {
       const s = this.state;
       if (!s) return;
+      this.clearGameTimer();
       let minCards = Infinity;
       for (const p of s.players) minCards = Math.min(minCards, p.hand.length);
       const leaders = s.players.filter(p => p.hand.length === minCards);
@@ -651,6 +673,11 @@
         pile: s.draw.length,
         discardN: s.discard.length,
         drawnThisTurn: s.turn === viewer ? s.drawnThisTurn : false,
+        timeLeft: this.gameTimeLeft(),
+        turnLeft: (s.phase === "playing" && s.turnStartedAt)
+          ? Math.max(0, this.TURN_LIMIT_MS - (Date.now() - s.turnStartedAt))
+          : null,
+        turnLimit: this.TURN_LIMIT_MS,
         grace: s.grace && s.grace.seat === viewer
           ? Math.max(0, s.grace.until - Date.now()) : null,
         winner: s.winner,

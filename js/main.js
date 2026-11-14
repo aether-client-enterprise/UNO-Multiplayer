@@ -56,10 +56,13 @@
   /* ---------- sair pro cobertor ---------- */
   function leaveToCover(msg) {
     Game.clearTimers();
+    Game.clearGameTimer();
+    if (global.Voice) global.Voice.reset();
     global.Net.closeAll();
     Game.state = null;
     mode = null;
     lastMask = null;
+    global.UI.clock = null;
     go("cover");
     $("modal-color").classList.add("hidden");
     $("modal-round").classList.add("hidden");
@@ -342,7 +345,6 @@
     if ($("draw-pile").classList.contains("disabled")) return;
     act({ k: "draw" });
   });
-  $("bt-pass").addEventListener("click", () => { global.Sfx.button(); act({ k: "pass" }); });
   $("bt-uno").addEventListener("click", () => act({ k: "uno" }));
   $("bt-exit").addEventListener("click", () => leaveToCover("você saiu da mesa"));
 
@@ -493,24 +495,185 @@
   // allow pressing Enter to send
   $("chat-input").addEventListener("keydown", e => { if (e.key === "Enter") $("chat-send").click(); });
 
-  /* ---------- sistema de voz ---------- */
-  // indicador visual de voz
-  const voices = ["🔊", "🔉", "🔈"];
-  let voiceIndex = 0;
+  /* ---------- voz real entre jogadores (WebRTC + sinalização MQTT) ---------- */
+  const Voice = {
+    active: false,
+    stream: null,
+    peers: new Map(),   // cid -> {pc, audio, pending, remoteSet}
+    users: new Map(),   // cid -> nome de quem está com o microfone ligado
+
+    supported() {
+      return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.RTCPeerConnection);
+    },
+
+    async toggle() {
+      if (!global.Net.role || !global.Net.client) {
+        global.UI.toast("a voz só funciona em sala online — crie ou entre em uma sala");
+        return;
+      }
+      if (this.active) {
+        this.stop();
+        global.UI.toast("microfone desligado");
+        return;
+      }
+      if (!this.supported()) {
+        global.UI.toast("este navegador não suporta voz (WebRTC)");
+        return;
+      }
+      if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+        global.UI.toast("o microfone exige HTTPS — abra o site publicado");
+        return;
+      }
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false
+        });
+      } catch (e) {
+        global.UI.toast(e && e.name === "NotAllowedError"
+          ? "permissão de microfone negada — libere no navegador"
+          : "não foi possível acessar o microfone");
+        return;
+      }
+      this.active = true;
+      const btn = $("voice-btn");
+      if (btn) { btn.classList.add("on"); btn.textContent = "🎙️"; }
+      global.UI.toast("microfone ligado — fale com os jogadores");
+      global.Net.voicePublishUser(playerName(), true);
+      for (const cid of Array.from(this.users.keys())) this.maybeConnect(cid);
+    },
+
+    stop() {
+      if (this.stream) {
+        for (const t of this.stream.getTracks()) t.stop();
+        this.stream = null;
+      }
+      for (const cid of Array.from(this.peers.keys())) this.closePeer(cid);
+      if (this.active && global.Net.client) global.Net.voicePublishUser(playerName(), false);
+      this.active = false;
+      const btn = $("voice-btn");
+      if (btn) { btn.classList.remove("on"); btn.textContent = "🎤"; }
+    },
+
+    // ao sair da sala: desliga o mic e esquece quem estava online (novo código = novos cids)
+    reset() {
+      this.stop();
+      this.users.clear();
+    },
+
+    onStatus(cid, name, on) {
+      if (!cid || cid === global.Net.cid) return;
+      if (on) {
+        this.users.set(cid, name || "Jogador");
+        if (this.active) this.maybeConnect(cid);
+      } else {
+        this.users.delete(cid);
+        this.closePeer(cid);
+      }
+    },
+
+    // sem glare: quem tem o menor cid inicia a oferta; o outro só responde
+    maybeConnect(cid) {
+      if (!this.active || !global.Net.cid || cid === global.Net.cid) return;
+      if (global.Net.cid > cid) return;
+      if (this.peers.has(cid)) return;
+      const peer = this.createPeer(cid);
+      this.offer(cid, peer);
+    },
+
+    createPeer(cid) {
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+          { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" }
+        ]
+      });
+      const peer = { pc: pc, audio: null, pending: [], remoteSet: false };
+      this.peers.set(cid, peer);
+      if (this.stream) for (const track of this.stream.getTracks()) pc.addTrack(track, this.stream);
+
+      pc.onicecandidate = e => {
+        if (e.candidate) global.Net.voiceSignal(cid, { kind: "ice", candidate: e.candidate });
+      };
+      pc.ontrack = e => {
+        if (!peer.audio) {
+          const a = document.createElement("audio");
+          a.autoplay = true;
+          a.playsInline = true;
+          a.dataset.voice = cid;
+          document.body.appendChild(a);
+          peer.audio = a;
+        }
+        peer.audio.srcObject = e.streams[0];
+        peer.audio.play().catch(() => {});
+      };
+      return peer;
+    },
+
+    async offer(cid, peer) {
+      try {
+        await peer.pc.setLocalDescription(await peer.pc.createOffer());
+        global.Net.voiceSignal(cid, { kind: "offer", sdp: peer.pc.localDescription });
+      } catch (_) { /* tenta de novo quando o status reaparecer */ }
+    },
+
+    async onSignal(from, data) {
+      if (!from || !data) return;
+      if (data.kind === "offer") {
+        // se eu sou o iniciador (menor cid), ignoro oferta cruzada
+        if (global.Net.cid && global.Net.cid < from) return;
+        let peer = this.peers.get(from);
+        if (!peer) peer = this.createPeer(from);
+        try {
+          await peer.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          peer.remoteSet = true;
+          for (const c of peer.pending) { try { await peer.pc.addIceCandidate(c); } catch (_) {} }
+          peer.pending = [];
+          await peer.pc.setLocalDescription(await peer.pc.createAnswer());
+          global.Net.voiceSignal(from, { kind: "answer", sdp: peer.pc.localDescription });
+        } catch (_) {}
+      } else if (data.kind === "answer") {
+        const peer = this.peers.get(from);
+        if (!peer) return;
+        try {
+          await peer.pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          peer.remoteSet = true;
+          for (const c of peer.pending) { try { await peer.pc.addIceCandidate(c); } catch (_) {} }
+          peer.pending = [];
+        } catch (_) {}
+      } else if (data.kind === "ice") {
+        const peer = this.peers.get(from);
+        if (!peer || !data.candidate) return;
+        if (!peer.remoteSet) { peer.pending.push(data.candidate); return; }
+        try { await peer.pc.addIceCandidate(data.candidate); } catch (_) {}
+      }
+    },
+
+    closePeer(cid) {
+      const peer = this.peers.get(cid);
+      if (!peer) return;
+      try { peer.pc.close(); } catch (_) {}
+      if (peer.audio) { peer.audio.srcObject = null; peer.audio.remove(); }
+      this.peers.delete(cid);
+    }
+  };
+
+  global.Net.onVoice = ev => {
+    if (!ev) return;
+    if (ev.kind === "user") Voice.onStatus(ev.cid, ev.name, ev.on);
+    else if (ev.kind === "signal") Voice.onSignal(ev.from, ev.data);
+  };
+
   $("voice-btn").addEventListener("click", () => {
     global.Sfx.button();
-    // alternar ícone de voz
-    voiceIndex = (voiceIndex + 1) % voices.length;
-    $("voice-btn").textContent = voices[voiceIndex];
-    // tentar usar Web Speech API para síntese de fala
-    if (window.SpeechSynthesis) {
-      const utterance = new SpeechSynthesisUtterance("Sua vez de jogar!");
-      utterance.rate = 1;
-      utterance.volume = 1;
-      utterance.pitch = 1;
-      window.speechSynthesis.speak(utterance);
-    }
+    Voice.toggle();
   });
+
+  // fechar a aba derruba o microfone e limpa o status retido
+  window.addEventListener("pagehide", () => { if (Voice.active) Voice.stop(); });
+
   document.addEventListener("pointerdown", () => global.Sfx.unlock(), { once: true });
   setInterval(() => global.UI.tick(), 250);
 
@@ -518,4 +681,5 @@
   go("cover");
 
   global.main = { act: act, leaveToCover: leaveToCover, get mode() { return mode; } };
+  global.Voice = Voice;
 })(window);
