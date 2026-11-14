@@ -425,7 +425,16 @@
       if (s.drawnThisTurn) return this.reject(seat);
       const p = s.players[seat];
       const card = this.takeOne();
-      if (!card) return this.reject(seat);
+      if (!card) {
+        // baralho e descarte esgotados: não há o que comprar, passa a vez
+        s.drawnThisTurn = false;
+        s.last = { kind: "pass", text: p.name + " não tinha carta para comprar" };
+        this.log(p.name + " não tinha carta para comprar — vez passada", null);
+        this.turnAdvance(1);
+        this.fire();
+        this.scheduleBot();
+        return;
+      }
       p.hand.push(card);
       s.drawnThisTurn = false;
       s.last = { kind: "draw", text: p.name + " comprou e passou" };
